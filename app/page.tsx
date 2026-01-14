@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { HeroSection } from "@/components/hero-section";
 import { SearchSection } from "@/components/search-section";
 import { ExampleSearches } from "@/components/example-searches";
+import { RecentSearches } from "@/components/recent-searches";
 
 function HomeContent() {
   return (
@@ -10,6 +11,7 @@ function HomeContent() {
         <HeroSection />
         <SearchSection />
         <ExampleSearches />
+        <RecentSearches />
       </main>
     </div>
   );
