@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
+import { getCachedSearchResultById } from "@/lib/cache";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -12,6 +13,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // 1) Prefer returning a fully cached result if available
+  const cached = await getCachedSearchResultById(searchId);
+  if (cached) {
+    return NextResponse.json({
+      searchId: cached.searchId,
+      status: cached.status,
+      result: cached,
+    });
+  }
+
+  // 2) Fallback to DB-only status
   const supabase = getSupabaseServiceClient();
 
   const { data, error } = await supabase
