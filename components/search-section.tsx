@@ -1,0 +1,757 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Search,
+  Loader2,
+  ChevronDown,
+  Filter,
+  Clock,
+  TrendingUp,
+  ArrowUp,
+  Sparkles,
+  MessageSquare,
+  Users,
+  ExternalLink,
+  Quote,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+const popularSearches = [
+  "Notion",
+  "Shopify",
+  "Freelance",
+  "Remote work",
+  "AI tools",
+  "Side hustle",
+  "SaaS",
+  "Productivity",
+];
+
+const mockSearchResults = [
+  {
+    id: 1,
+    painTitle:
+      "Users struggle with overwhelming feature complexity in project management tools",
+    mentions: 847,
+    subreddit: "r/productivity",
+    quotes: [
+      {
+        text: "Every time I open the app, I spend 10 minutes just trying to find what I need. It's exhausting.",
+        upvotes: 234,
+        author: "u/frustrated_pm",
+      },
+      {
+        text: "I just want to make a simple to-do list without learning a whole new system...",
+        upvotes: 189,
+        author: "u/simple_tasks",
+      },
+      {
+        text: "The learning curve killed my team's adoption. We went back to spreadsheets.",
+        upvotes: 156,
+        author: "u/team_lead_99",
+      },
+    ],
+  },
+  {
+    id: 2,
+    painTitle:
+      "Difficulty syncing data across multiple devices creates workflow disruptions",
+    mentions: 623,
+    subreddit: "r/entrepreneur",
+    quotes: [
+      {
+        text: "Lost 3 hours of work because my phone didn't sync with desktop. Absolute nightmare.",
+        upvotes: 312,
+        author: "u/sync_issues",
+      },
+      {
+        text: "Why is real-time sync still a problem in 2024? This should be solved by now.",
+        upvotes: 198,
+        author: "u/tech_rant",
+      },
+    ],
+  },
+  {
+    id: 3,
+    painTitle:
+      "Pricing models feel exploitative with essential features locked behind premium tiers",
+    mentions: 1203,
+    subreddit: "r/startups",
+    quotes: [
+      {
+        text: "Basic export functionality shouldn't be a 'premium' feature. It's borderline predatory.",
+        upvotes: 456,
+        author: "u/indie_dev",
+      },
+      {
+        text: "Started with free tier, got hooked, now paying $30/mo for features that should be standard.",
+        upvotes: 287,
+        author: "u/bootstrapper",
+      },
+      {
+        text: "The bait-and-switch pricing is why I'm building my own alternative.",
+        upvotes: 203,
+        author: "u/fed_up_founder",
+      },
+    ],
+  },
+  {
+    id: 4,
+    painTitle:
+      "Poor customer support response times leave users stranded during critical issues",
+    mentions: 445,
+    subreddit: "r/smallbusiness",
+    quotes: [
+      {
+        text: "Submitted a ticket 2 weeks ago. Still waiting. My business literally depends on this.",
+        upvotes: 178,
+        author: "u/waiting_forever",
+      },
+      {
+        text: "Got a canned response that didn't even address my issue. Feels like talking to a wall.",
+        upvotes: 134,
+        author: "u/support_nightmare",
+      },
+    ],
+  },
+];
+
+export function SearchSection() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSubreddits, setSelectedSubreddits] = useState<string[]>([]);
+  const [timeRange, setTimeRange] = useState("month");
+  const [minUpvotes, setMinUpvotes] = useState("10");
+  const [sortBy, setSortBy] = useState("relevance");
+  const [searchResults, setSearchResults] = useState<
+    typeof mockSearchResults | null
+  >(searchParams.get("q") ? mockSearchResults : null);
+  const [showResults, setShowResults] = useState(!!searchParams.get("q"));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filteredSuggestions = popularSearches.filter((s) =>
+    s.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const simulateProgress = useCallback(() => {
+    setLoadingProgress(0);
+    const stages = [
+      { target: 30, duration: 300 },
+      { target: 60, duration: 500 },
+      { target: 85, duration: 800 },
+      { target: 95, duration: 600 },
+    ];
+
+    let currentStage = 0;
+    const runStage = () => {
+      if (currentStage >= stages.length) return;
+
+      const { target, duration } = stages[currentStage];
+      const startProgress =
+        currentStage === 0 ? 0 : stages[currentStage - 1].target;
+      const startTime = Date.now();
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        setLoadingProgress(startProgress + (target - startProgress) * eased);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          currentStage++;
+          runStage();
+        }
+      };
+      requestAnimationFrame(animate);
+    };
+    runStage();
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    if (query.length < 2) return;
+
+    setIsLoading(true);
+    setShowResults(false);
+    simulateProgress();
+
+    // Update URL with search query
+    const params = new URLSearchParams();
+    params.set("q", query);
+    if (selectedSubreddits.length > 0)
+      params.set("subs", selectedSubreddits.join(","));
+    if (timeRange !== "month") params.set("time", timeRange);
+    if (minUpvotes !== "10") params.set("upvotes", minUpvotes);
+    if (sortBy !== "relevance") params.set("sort", sortBy);
+
+    router.push(`?${params.toString()}`, { scroll: false });
+
+    // Simulate API call
+    setTimeout(() => {
+      setLoadingProgress(100);
+      setTimeout(() => {
+        setIsLoading(false);
+        setSearchResults(mockSearchResults);
+        setShowResults(true);
+        setLoadingProgress(0);
+      }, 200);
+    }, 2200);
+  }, [
+    query,
+    selectedSubreddits,
+    timeRange,
+    minUpvotes,
+    sortBy,
+    router,
+    simulateProgress,
+  ]);
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setQuery(suggestion);
+    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setShowSuggestions(false);
+    if (showSuggestions) {
+      document.addEventListener("click", handleClickOutside);
+    }
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showSuggestions]);
+
+  const subreddits = [
+    { value: "all", label: "All Subreddits" },
+    { value: "entrepreneur", label: "r/entrepreneur" },
+    { value: "startups", label: "r/startups" },
+    { value: "saas", label: "r/SaaS" },
+    { value: "smallbusiness", label: "r/smallbusiness" },
+    { value: "freelance", label: "r/freelance" },
+  ];
+
+  return (
+    <section className="relative py-8 lg:py-10">
+      <div className="fixed top-0 left-0 right-0 z-[100] h-1 pointer-events-none">
+        <div
+          className={cn(
+            "h-full transition-all duration-200 ease-out",
+            loadingProgress > 0 ? "opacity-100" : "opacity-0"
+          )}
+          style={{
+            width: `${loadingProgress}%`,
+            background: "linear-gradient(90deg, #ea580c, #f97316, #fb923c)",
+            boxShadow:
+              "0 0 10px rgba(234, 88, 12, 0.7), 0 0 20px rgba(234, 88, 12, 0.4)",
+          }}
+        />
+        {loadingProgress > 0 && loadingProgress < 100 && (
+          <div
+            className="absolute right-0 top-0 h-full w-24 animate-pulse"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(255,255,255,0.4))",
+              transform: `translateX(${loadingProgress < 95 ? "0" : "100%"})`,
+            }}
+          />
+        )}
+      </div>
+
+      <div className="max-w-3xl mx-auto px-6 lg:px-8">
+        {/* Search Input Card */}
+        <div
+          className={cn(
+            "relative rounded-2xl transition-all duration-500 ease-out overflow-visible",
+            isFocused
+              ? "shadow-[0_4px_8px_rgba(0,0,0,0.04),0_16px_32px_rgba(0,0,0,0.08),0_32px_64px_rgba(0,0,0,0.06),0_0_0_1px_rgba(234,88,12,0.15)]"
+              : "shadow-[0_2px_4px_rgba(0,0,0,0.02),0_8px_16px_rgba(0,0,0,0.04),0_16px_32px_rgba(0,0,0,0.02)]"
+          )}
+        >
+          {/* Gradient border */}
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-border/50 via-border/30 to-border/50 p-px">
+            <div className="absolute inset-px rounded-[15px] bg-card" />
+          </div>
+
+          {/* Top highlight */}
+          <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+
+          <div className="relative flex items-center bg-card rounded-2xl">
+            <div className="absolute left-5 flex items-center pointer-events-none">
+              {isLoading ? (
+                <div className="relative">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  <div className="absolute inset-0 blur-sm opacity-50">
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  </div>
+                </div>
+              ) : (
+                <Search
+                  className={cn(
+                    "w-5 h-5 transition-colors duration-300",
+                    isFocused ? "text-primary" : "text-muted-foreground"
+                  )}
+                />
+              )}
+            </div>
+
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShowSuggestions(e.target.value.length > 0);
+              }}
+              onFocus={() => {
+                setIsFocused(true);
+                if (query.length > 0) setShowSuggestions(true);
+              }}
+              onBlur={() => setIsFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSearch();
+                  setShowSuggestions(false);
+                }
+              }}
+              placeholder="Enter keyword (e.g., Notion, Shopify, Freelance)"
+              className="w-full h-16 lg:h-[72px] pl-14 pr-36 text-base lg:text-lg bg-transparent border-0 outline-none placeholder:text-muted-foreground/50"
+            />
+
+            <div className="absolute right-3 flex items-center gap-3">
+              <span
+                className={cn(
+                  "text-xs font-mono px-2 py-1 rounded-md transition-all duration-200",
+                  query.length < 2
+                    ? "text-muted-foreground bg-transparent"
+                    : "text-foreground bg-secondary"
+                )}
+              >
+                {query.length}/50
+              </span>
+              <Button
+                onClick={handleSearch}
+                disabled={query.length < 2 || isLoading}
+                className={cn(
+                  "h-11 px-6 bg-foreground text-background font-medium rounded-xl",
+                  "disabled:opacity-50 transition-all duration-300",
+                  "hover:shadow-[0_4px_16px_rgba(0,0,0,0.2)] hover:-translate-y-0.5",
+                  "relative overflow-hidden shimmer-hover",
+                  query.length >= 2 && !isLoading && "animate-pulse-glow"
+                )}
+                style={{
+                  boxShadow:
+                    query.length >= 2
+                      ? "0 4px 12px rgba(0,0,0,0.15)"
+                      : undefined,
+                }}
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 animate-pulse" />
+                    Mining...
+                  </span>
+                ) : (
+                  "Search"
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Suggestions dropdown */}
+          {showSuggestions && filteredSuggestions.length > 0 && (
+            <div
+              className="absolute top-full left-0 right-0 mt-3 bg-card rounded-xl overflow-hidden z-10 animate-in fade-in slide-in-from-top-2 duration-200"
+              style={{
+                boxShadow:
+                  "0 4px 8px rgba(0,0,0,0.04), 0 16px 32px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+              <div className="p-2 relative">
+                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <TrendingUp className="w-3 h-3" />
+                  Trending searches
+                </p>
+                {filteredSuggestions.slice(0, 5).map((suggestion, i) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-3 text-left rounded-lg",
+                      "hover:bg-gradient-to-r hover:from-secondary/80 hover:to-secondary/40",
+                      "transition-all duration-200 group"
+                    )}
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors duration-200">
+                      <TrendingUp className="w-4 h-4 text-muted-foreground group-hover:text-background transition-colors duration-200" />
+                    </div>
+                    <span className="text-sm font-medium">{suggestion}</span>
+                    <span className="ml-auto text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      Search
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Advanced Options Accordion */}
+        <div className="mt-8">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="options" className="border-0">
+              <AccordionTrigger className="group flex items-center gap-2 py-3 px-5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm">
+                <Filter className="w-4 h-4" />
+                <span>Advanced Options</span>
+                {/* <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                    Customize your search
+                  </span>
+                  <ChevronDown className="w-4 h-4 transition-transform duration-300 group-data-[state=open]:rotate-180" />
+                </div> */}
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 pb-2">
+                <div
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl relative overflow-hidden"
+                  style={{
+                    background:
+                      "linear-gradient(to bottom, rgba(0,0,0,0.01), rgba(0,0,0,0.02))",
+                    boxShadow:
+                      "inset 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.03)",
+                  }}
+                >
+                  <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+                  {/* Subreddit Filter */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <span className="w-2 h-2 rounded-full bg-gradient-to-br from-primary to-orange-600 shadow-sm" />
+                      Subreddit Filter
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {subreddits.map((sub) => {
+                        const isActive =
+                          (sub.value === "all" &&
+                            selectedSubreddits.length === 0) ||
+                          selectedSubreddits.includes(sub.value);
+                        return (
+                          <button
+                            key={sub.value}
+                            onClick={() => {
+                              if (sub.value === "all") {
+                                setSelectedSubreddits([]);
+                              } else {
+                                setSelectedSubreddits((prev) =>
+                                  prev.includes(sub.value)
+                                    ? prev.filter((s) => s !== sub.value)
+                                    : [...prev, sub.value]
+                                );
+                              }
+                            }}
+                            className={cn(
+                              "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200 relative overflow-hidden",
+                              isActive
+                                ? "bg-foreground text-background shadow-md"
+                                : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
+                            )}
+                            style={
+                              isActive
+                                ? { boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }
+                                : undefined
+                            }
+                          >
+                            {sub.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Time Range */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      Time Range
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: "week", label: "Past Week" },
+                        { value: "month", label: "Past Month" },
+                        { value: "year", label: "Past Year" },
+                        { value: "all", label: "All Time" },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => setTimeRange(option.value)}
+                          className={cn(
+                            "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
+                            timeRange === option.value
+                              ? "bg-foreground text-background shadow-md"
+                              : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
+                          )}
+                          style={
+                            timeRange === option.value
+                              ? { boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }
+                              : undefined
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Min Upvotes */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <ArrowUp className="w-3.5 h-3.5 text-primary" />
+                      Minimum Upvotes
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {["0", "10", "50", "100", "500"].map((value) => (
+                        <button
+                          key={value}
+                          onClick={() => setMinUpvotes(value)}
+                          className={cn(
+                            "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
+                            minUpvotes === value
+                              ? "bg-foreground text-background shadow-md"
+                              : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
+                          )}
+                          style={
+                            minUpvotes === value
+                              ? { boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }
+                              : undefined
+                          }
+                        >
+                          {value === "0" ? "Any" : `${value}+`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sort By */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                      Sort By
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: "relevance", label: "Relevance" },
+                        { value: "upvotes", label: "Upvotes" },
+                        { value: "recency", label: "Recency" },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => setSortBy(option.value)}
+                          className={cn(
+                            "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
+                            sortBy === option.value
+                              ? "bg-foreground text-background shadow-md"
+                              : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
+                          )}
+                          style={
+                            sortBy === option.value
+                              ? { boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }
+                              : undefined
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+
+        {showResults && searchResults && (
+          <div className="mt-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Results header */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Pain Points Found</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {searchResults.length} insights for "{query}"
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Users className="w-4 h-4" />
+                <span>
+                  {searchResults
+                    .reduce((acc, r) => acc + r.mentions, 0)
+                    .toLocaleString()}{" "}
+                  total mentions
+                </span>
+              </div>
+            </div>
+
+            {/* Result Cards */}
+            <div className="space-y-4">
+              {searchResults.map((result, index) => (
+                <div
+                  key={result.id}
+                  className="group relative rounded-2xl bg-card overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                  style={{
+                    boxShadow:
+                      "0 2px 4px rgba(0,0,0,0.02), 0 8px 16px rgba(0,0,0,0.04), 0 16px 32px rgba(0,0,0,0.02)",
+                    animationDelay: `${index * 100}ms`,
+                  }}
+                >
+                  {/* Card gradient border */}
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-border/60 via-border/30 to-border/60 p-px pointer-events-none">
+                    <div className="absolute inset-px rounded-[15px] bg-card" />
+                  </div>
+
+                  {/* Top highlight */}
+                  <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+
+                  {/* Hover glow effect */}
+                  <div
+                    className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background:
+                        "radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 0%), rgba(234, 88, 12, 0.03), transparent 40%)",
+                    }}
+                  />
+
+                  <div className="relative p-6">
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-4 mb-5">
+                      <div className="flex-1 space-y-2">
+                        <h3 className="text-base font-semibold leading-snug text-foreground group-hover:text-primary transition-colors duration-300">
+                          {result.painTitle}
+                        </h3>
+                        <div className="flex items-center gap-3">
+                          {/* Subreddit Badge */}
+                          <span
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200"
+                            style={{
+                              background:
+                                "linear-gradient(135deg, rgba(255, 69, 0, 0.1), rgba(255, 69, 0, 0.05))",
+                              border: "1px solid rgba(255, 69, 0, 0.2)",
+                              color: "#ff4500",
+                            }}
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <circle
+                                cx="10"
+                                cy="10"
+                                r="10"
+                                fill="currentColor"
+                                fillOpacity="0.15"
+                              />
+                              <path
+                                d="M16.67 10a1.46 1.46 0 0 0-2.47-1 7.12 7.12 0 0 0-3.85-1.23l.65-3.08 2.14.45a1 1 0 1 0 .13-.61l-2.39-.53a.27.27 0 0 0-.31.2l-.72 3.47a7.14 7.14 0 0 0-3.9 1.23 1.46 1.46 0 1 0-1.61 2.39 2.87 2.87 0 0 0 0 .44c0 2.24 2.61 4.06 5.83 4.06s5.83-1.82 5.83-4.06a2.87 2.87 0 0 0 0-.44 1.46 1.46 0 0 0 .67-1.29zM6.67 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm5.61 2.71a3.94 3.94 0 0 1-2.28.61 3.94 3.94 0 0 1-2.28-.61.27.27 0 1 1 .31-.45 3.41 3.41 0 0 0 2 .51 3.41 3.41 0 0 0 2-.51.27.27 0 0 1 .31.45zm-.28-1.71a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                            {result.subreddit}
+                          </span>
+
+                          {/* Mentions count */}
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            {result.mentions.toLocaleString()} mentions
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expand button */}
+                      <button className="flex-shrink-0 w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-secondary hover:scale-105">
+                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </div>
+
+                    {/* Quotes Section */}
+                    <div className="space-y-3">
+                      {result.quotes.map((quote, qIndex) => (
+                        <div
+                          key={qIndex}
+                          className="relative pl-4 py-3 rounded-xl transition-all duration-200 hover:bg-secondary/30"
+                          style={{
+                            background:
+                              "linear-gradient(to right, rgba(0,0,0,0.02), transparent)",
+                          }}
+                        >
+                          {/* Quote indicator line */}
+                          <div
+                            className="absolute left-0 top-3 bottom-3 w-1 rounded-full"
+                            style={{
+                              background:
+                                "linear-gradient(to bottom, rgba(234, 88, 12, 0.6), rgba(234, 88, 12, 0.2))",
+                            }}
+                          />
+
+                          <div className="flex items-start gap-2">
+                            <Quote className="w-4 h-4 text-primary/40 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-foreground/90 leading-relaxed italic">
+                                "{quote.text}"
+                              </p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <span className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer">
+                                  {quote.author}
+                                </span>
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <ArrowUp className="w-3 h-3" />
+                                  {quote.upvotes}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Load more button */}
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                className="px-8 py-3 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 bg-transparent"
+              >
+                <span className="flex items-center gap-2">
+                  Load more results
+                  <ChevronDown className="w-4 h-4" />
+                </span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
