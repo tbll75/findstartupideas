@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/hero-section";
 import { SearchSection } from "@/components/search-section";
 import { ExampleSearches } from "@/components/example-searches";
 import { RecentSearches } from "@/components/recent-searches";
+import { Footer } from "@/components/footer";
 
 function HomeContent() {
   return (
@@ -13,6 +14,7 @@ function HomeContent() {
         <ExampleSearches />
         <RecentSearches />
       </main>
+      <Footer />
     </div>
   );
 }
