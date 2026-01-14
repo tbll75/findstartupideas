@@ -1,9 +1,20 @@
-import { Button } from "@/components/ui/button";
+import { Suspense } from "react";
+import { HeroSection } from "@/components/hero-section";
 
-export default function Home() {
+function HomeContent() {
   return (
-    <main>
-      <Button>Let's Build</Button>
-    </main>
+    <div className="min-h-screen flex flex-col">
+      <main className="flex-1">
+        <HeroSection />
+      </main>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }
