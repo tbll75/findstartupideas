@@ -24,6 +24,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import type { SearchResult } from "@/lib/validation";
 
 const popularSearches = [
   "Notion",
@@ -42,7 +43,7 @@ const mockSearchResults = [
     painTitle:
       "Users struggle with overwhelming feature complexity in project management tools",
     mentions: 847,
-    subreddit: "r/productivity",
+    tag: "story",
     quotes: [
       {
         text: "Every time I open the app, I spend 10 minutes just trying to find what I need. It's exhausting.",
@@ -66,7 +67,7 @@ const mockSearchResults = [
     painTitle:
       "Difficulty syncing data across multiple devices creates workflow disruptions",
     mentions: 623,
-    subreddit: "r/entrepreneur",
+    tag: "ask_hn",
     quotes: [
       {
         text: "Lost 3 hours of work because my phone didn't sync with desktop. Absolute nightmare.",
@@ -85,7 +86,7 @@ const mockSearchResults = [
     painTitle:
       "Pricing models feel exploitative with essential features locked behind premium tiers",
     mentions: 1203,
-    subreddit: "r/startups",
+    tag: "show_hn",
     quotes: [
       {
         text: "Basic export functionality shouldn't be a 'premium' feature. It's borderline predatory.",
@@ -109,7 +110,7 @@ const mockSearchResults = [
     painTitle:
       "Poor customer support response times leave users stranded during critical issues",
     mentions: 445,
-    subreddit: "r/smallbusiness",
+    tag: "story",
     quotes: [
       {
         text: "Submitted a ticket 2 weeks ago. Still waiting. My business literally depends on this.",
@@ -134,16 +135,18 @@ export function SearchSection() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedSubreddits, setSelectedSubreddits] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [timeRange, setTimeRange] = useState("month");
   const [minUpvotes, setMinUpvotes] = useState("10");
   const [sortBy, setSortBy] = useState("relevance");
   const [searchResults, setSearchResults] = useState<
     typeof mockSearchResults | null
-  >(searchParams.get("q") ? mockSearchResults : null);
+  >(null);
   const [searchId, setSearchId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showResults, setShowResults] = useState(!!searchParams.get("q"));
+  const [showResults, setShowResults] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredSuggestions = popularSearches.filter((s) =>
@@ -186,18 +189,148 @@ export function SearchSection() {
     runStage();
   }, []);
 
+  /**
+   * Transform SearchResult to UI format
+   */
+  const transformSearchResult = useCallback((result: SearchResult): typeof mockSearchResults => {
+    // Group quotes by pain point
+    const quotesByPainPoint = new Map<string, Array<{
+      text: string;
+      upvotes: number;
+      author: string;
+      permalink?: string;
+    }>>();
+    
+    result.quotes.forEach((quote) => {
+      if (!quotesByPainPoint.has(quote.painPointId)) {
+        quotesByPainPoint.set(quote.painPointId, []);
+      }
+      const quoteData: {
+        text: string;
+        upvotes: number;
+        author: string;
+        permalink?: string;
+      } = {
+        text: quote.quoteText,
+        upvotes: quote.upvotes,
+        author: quote.authorHandle || "Anonymous",
+      };
+      if (quote.permalink) {
+        quoteData.permalink = quote.permalink;
+      }
+      quotesByPainPoint.get(quote.painPointId)!.push(quoteData);
+    });
+
+    // Map pain points to UI format
+    return result.painPoints.map((pp, idx) => ({
+      id: idx + 1,
+      painTitle: pp.title,
+      mentions: pp.mentionsCount,
+      tag: pp.sourceTag,
+      quotes: quotesByPainPoint.get(pp.id) || [],
+    }));
+  }, []);
+
+  /**
+   * Poll for search results
+   */
+  const pollSearchStatus = useCallback(async (id: string, maxAttempts = 20) => {
+    let attempts = 0;
+    
+    const poll = async (): Promise<void> => {
+      if (attempts >= maxAttempts) {
+        setIsPolling(false);
+        setErrorMessage("Search is taking longer than expected. Please refresh the page later.");
+        setIsLoading(false);
+        setLoadingProgress(0);
+        return;
+      }
+
+      attempts++;
+
+      try {
+        const response = await fetch(`/api/search-status?searchId=${id}`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch search status");
+        }
+
+        const data = await response.json();
+
+        // Check if we got a full SearchResult
+        if (data.status === "completed" && data.painPoints) {
+          setIsPolling(false);
+          setIsLoading(false);
+          setLoadingProgress(100);
+          
+          const transformed = transformSearchResult(data as SearchResult);
+          setSearchResults(transformed);
+          setShowResults(true);
+          
+          setTimeout(() => {
+            setLoadingProgress(0);
+          }, 300);
+          return;
+        }
+
+        // Check if failed
+        if (data.status === "failed") {
+          setIsPolling(false);
+          setIsLoading(false);
+          setLoadingProgress(0);
+          setErrorMessage(
+            data.errorMessage || "Search failed. Please try again."
+          );
+          return;
+        }
+
+        // Still processing, poll again
+        if (data.status === "processing" || data.status === "pending") {
+          setTimeout(poll, 2000); // Poll every 2 seconds
+        }
+      } catch (error) {
+        console.error("Error polling search status:", error);
+        setIsPolling(false);
+        setIsLoading(false);
+        setLoadingProgress(0);
+        setErrorMessage("Unable to check search status. Please try again.");
+      }
+    };
+
+    poll();
+  }, [transformSearchResult]);
+
+  /**
+   * Cleanup polling on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
   const handleSearch = useCallback(async () => {
     if (query.length < 2) return;
 
     setIsLoading(true);
     setShowResults(false);
     setErrorMessage(null);
+    setIsPolling(false);
+    setSearchId(null);
+    
+    // Clear any existing polling
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
     simulateProgress();
 
     const params = new URLSearchParams();
     params.set("q", query);
-    if (selectedSubreddits.length > 0)
-      params.set("subs", selectedSubreddits.join(","));
+    if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
     if (timeRange !== "month") params.set("time", timeRange);
     if (minUpvotes !== "10") params.set("upvotes", minUpvotes);
     if (sortBy !== "relevance") params.set("sort", sortBy);
@@ -212,7 +345,7 @@ export function SearchSection() {
         },
         body: JSON.stringify({
           topic: query,
-          subreddits: selectedSubreddits,
+          tags: selectedTags,
           timeRange,
           minUpvotes: Number(minUpvotes),
           sortBy,
@@ -224,39 +357,67 @@ export function SearchSection() {
         const message =
           errorData?.error || "Something went wrong starting your search.";
         setErrorMessage(message);
+        setIsLoading(false);
+        setLoadingProgress(0);
         return;
       }
 
-      const data: { searchId: string; status: string } = await response.json();
+      const data = await response.json();
 
-      setSearchId(data.searchId);
-
-      // While the backend worker pipeline is not wired yet,
-      // we still display the mock results so the UX matches.
-      setLoadingProgress(100);
-      setTimeout(() => {
+      // Check if we got a full SearchResult (cached or completed quickly)
+      if (data.status === "completed" && data.painPoints) {
         setIsLoading(false);
-        setSearchResults(mockSearchResults);
+        setLoadingProgress(100);
+        
+        const transformed = transformSearchResult(data as SearchResult);
+        setSearchResults(transformed);
         setShowResults(true);
+        setSearchId(data.searchId);
+        
+        setTimeout(() => {
+          setLoadingProgress(0);
+        }, 300);
+        return;
+      }
+
+      // Otherwise, we got a searchId and status
+      const searchId = data.searchId;
+      const status = data.status;
+
+      if (!searchId) {
+        setIsLoading(false);
         setLoadingProgress(0);
-      }, 200);
+        setErrorMessage("Invalid response from server.");
+        return;
+      }
+
+      setSearchId(searchId);
+
+      // If processing, start polling
+      if (status === "processing" || status === "pending") {
+        setIsPolling(true);
+        await pollSearchStatus(searchId);
+      } else if (status === "failed") {
+        setIsLoading(false);
+        setLoadingProgress(0);
+        setErrorMessage(data.errorMessage || "Search failed. Please try again.");
+      }
     } catch (error) {
       console.error("Error calling /api/search:", error);
       setErrorMessage("Unable to reach the search service. Please try again.");
-    } finally {
-      if (loadingProgress < 100) {
-        setLoadingProgress(100);
-      }
+      setIsLoading(false);
+      setLoadingProgress(0);
     }
   }, [
     query,
-    selectedSubreddits,
+    selectedTags,
     timeRange,
     minUpvotes,
     sortBy,
     router,
     simulateProgress,
-    loadingProgress,
+    transformSearchResult,
+    pollSearchStatus,
   ]);
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -273,13 +434,12 @@ export function SearchSection() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showSuggestions]);
 
-  const subreddits = [
-    { value: "all", label: "All Subreddits" },
-    { value: "entrepreneur", label: "r/entrepreneur" },
-    { value: "startups", label: "r/startups" },
-    { value: "saas", label: "r/SaaS" },
-    { value: "smallbusiness", label: "r/smallbusiness" },
-    { value: "freelance", label: "r/freelance" },
+  const hnTags = [
+    { value: "story", label: "Stories" },
+    { value: "ask_hn", label: "Ask HN" },
+    { value: "show_hn", label: "Show HN" },
+    { value: "front_page", label: "Front Page" },
+    { value: "poll", label: "Polls" },
   ];
 
   return (
@@ -400,7 +560,7 @@ export function SearchSection() {
                 {isLoading ? (
                   <span className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 animate-pulse" />
-                    Mining...
+                    {isPolling ? "Mining..." : "Starting..."}
                   </span>
                 ) : (
                   "Search"
@@ -476,31 +636,24 @@ export function SearchSection() {
                 >
                   <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
-                  {/* Subreddit Filter */}
+                  {/* HN Tag Filter */}
                   <div className="space-y-3">
                     <label className="flex items-center gap-2 text-sm font-medium">
                       <span className="w-2 h-2 rounded-full bg-gradient-to-br from-primary to-orange-600 shadow-sm" />
-                      Subreddit Filter
+                      Hacker News Tag Filter
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {subreddits.map((sub) => {
-                        const isActive =
-                          (sub.value === "all" &&
-                            selectedSubreddits.length === 0) ||
-                          selectedSubreddits.includes(sub.value);
+                      {hnTags.map((tag) => {
+                        const isActive = selectedTags.includes(tag.value);
                         return (
                           <button
-                            key={sub.value}
+                            key={tag.value}
                             onClick={() => {
-                              if (sub.value === "all") {
-                                setSelectedSubreddits([]);
-                              } else {
-                                setSelectedSubreddits((prev) =>
-                                  prev.includes(sub.value)
-                                    ? prev.filter((s) => s !== sub.value)
-                                    : [...prev, sub.value]
-                                );
-                              }
+                              setSelectedTags((prev) =>
+                                prev.includes(tag.value)
+                                  ? prev.filter((s) => s !== tag.value)
+                                  : [...prev, tag.value]
+                              );
                             }}
                             className={cn(
                               "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200 relative overflow-hidden",
@@ -514,7 +667,7 @@ export function SearchSection() {
                                 : undefined
                             }
                           >
-                            {sub.label}
+                            {tag.label}
                           </button>
                         );
                       })}
@@ -631,6 +784,21 @@ export function SearchSection() {
               </div>
             )}
 
+            {/* Loading/Processing state */}
+            {isLoading && !showResults && !errorMessage && (
+              <div className="mt-12 text-center space-y-4">
+                <div className="flex items-center justify-center gap-3">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  <span className="text-lg font-medium">
+                    {isPolling ? "Mining insights from Hacker News..." : "Starting search..."}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  This may take a few moments while we analyze discussions...
+                </p>
+              </div>
+            )}
+
             {/* Results header */}
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
@@ -692,7 +860,7 @@ export function SearchSection() {
                           {result.painTitle}
                         </h3>
                         <div className="flex items-center gap-3">
-                          {/* Subreddit Badge */}
+                          {/* HN Tag Badge */}
                           <span
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200"
                             style={{
@@ -719,21 +887,21 @@ export function SearchSection() {
                                 fill="currentColor"
                               />
                             </svg>
-                            {result.subreddit}
+                            {result.tag}
                           </span>
 
                           {/* Mentions count */}
                           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <MessageSquare className="w-3.5 h-3.5" />
-                            {result.mentions.toLocaleString()} mentions
+                            {result.mentions.toLocaleString()} {result.mentions === 1 ? "mention" : "mentions"}
                           </span>
                         </div>
                       </div>
 
-                      {/* Expand button */}
-                      <button className="flex-shrink-0 w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-secondary hover:scale-105">
+                      {/* Expand button placeholder */}
+                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
                         <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                      </button>
+                      </div>
                     </div>
 
                     {/* Quotes Section */}
@@ -763,13 +931,30 @@ export function SearchSection() {
                                 "{quote.text}"
                               </p>
                               <div className="flex items-center gap-3 mt-2">
-                                <span className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-                                  {quote.author}
-                                </span>
+                                {quote.author && (
+                                  <a
+                                    href={quote.permalink || `https://news.ycombinator.com/user?id=${quote.author}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                                  >
+                                    {quote.author}
+                                  </a>
+                                )}
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <ArrowUp className="w-3 h-3" />
-                                  {quote.upvotes}
+                                  {quote.upvotes.toLocaleString()}
                                 </span>
+                                {quote.permalink && (
+                                  <a
+                                    href={quote.permalink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
                               </div>
                             </div>
                           </div>

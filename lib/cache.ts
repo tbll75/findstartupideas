@@ -96,11 +96,11 @@ export async function redisDel(key: string): Promise<number> {
  */
 export function buildSearchKey(input: SearchRequest): string {
   const topic = input.topic.trim().toLowerCase();
-  const subs = (input.subreddits ?? []).map((s) => s.toLowerCase()).sort();
+  const tags = (input.tags ?? []).map((t) => t.toLowerCase()).sort();
 
   const payload = {
     topic,
-    subreddits: subs,
+    tags,
     timeRange: input.timeRange,
     minUpvotes: input.minUpvotes,
     sortBy: input.sortBy,

@@ -8,7 +8,16 @@ import { z } from "zod";
 
 export const timeRangeEnum = z.enum(["week", "month", "year", "all"]);
 
+// Keep existing values for UI compatibility; map to HN search (relevance/popularity/date)
 export const sortByEnum = z.enum(["relevance", "upvotes", "recency"]);
+
+export const hnTagsEnum = z.enum([
+  "story",
+  "ask_hn",
+  "show_hn",
+  "front_page",
+  "poll",
+]);
 
 export const SearchRequestSchema = z
   .object({
@@ -20,10 +29,7 @@ export const SearchRequestSchema = z
       .refine((value) => value.length > 0, {
         message: "Topic cannot be empty",
       }),
-    subreddits: z
-      .array(z.string().regex(/^[A-Za-z0-9_]{2,21}$/, "Invalid subreddit name"))
-      .max(10, "You can specify at most 10 subreddits")
-      .optional()
+    tags: z.array(hnTagsEnum).max(10, "You can specify at most 10 tags").optional()
       .default([]),
     timeRange: timeRangeEnum.default("month"),
     minUpvotes: z
@@ -42,7 +48,7 @@ const PainPointSchema = z.object({
   id: z.string().uuid(),
   searchId: z.string().uuid(),
   title: z.string(),
-  subreddit: z.string(),
+  sourceTag: z.string(),
   mentionsCount: z.number().int().nonnegative(),
   severityScore: z.number().min(0).max(10).optional(),
 });
@@ -87,14 +93,14 @@ export const SearchResultSchema = z.object({
   searchId: z.string().uuid(),
   status: z.enum(["pending", "processing", "completed", "failed"]),
   topic: z.string(),
-  subreddits: z.array(z.string()),
+  tags: z.array(hnTagsEnum),
   timeRange: timeRangeEnum,
   minUpvotes: z.number().int().min(0),
   sortBy: sortByEnum,
   totalMentions: z.number().int().nonnegative().optional(),
   totalPostsConsidered: z.number().int().nonnegative().optional(),
   totalCommentsConsidered: z.number().int().nonnegative().optional(),
-  sourceSubreddits: z.array(z.string()).optional(),
+  sourceTags: z.array(z.string()).optional(),
   painPoints: z.array(PainPointSchema),
   quotes: z.array(PainPointQuoteSchema),
   analysis: AiAnalysisSchema.optional(),

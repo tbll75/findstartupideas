@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { SearchRequestSchema, type SearchRequest } from "@/lib/validation";
+import { SearchRequestSchema, type SearchRequest, SearchResultSchema, type SearchResult } from "@/lib/validation";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import {
   buildSearchKey,
   getCachedSearchResultByKey,
+  getCachedSearchResultById,
   getSearchIdForKey,
   setSearchKeyForId,
 } from "@/lib/cache";
@@ -81,6 +82,192 @@ async function enforceRateLimits(req: NextRequest, input: SearchRequest) {
   return null;
 }
 
+/**
+ * Trigger the scrape_and_analyze edge function
+ */
+async function triggerEdgeFunction(searchId: string): Promise<void> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase configuration");
+  }
+
+  const edgeFunctionUrl = `${supabaseUrl}/functions/v1/scrape_and_analyze`;
+  
+  // Fire and forget - don't wait for completion
+  fetch(edgeFunctionUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ searchId }),
+  }).catch((err) => {
+    console.error("[triggerEdgeFunction] Failed to invoke edge function", err);
+  });
+}
+
+/**
+ * Short-poll for search results, checking cache and DB
+ */
+async function shortPollForResults(
+  searchId: string,
+  maxWaitMs: number = 8000
+): Promise<SearchResult | null> {
+  const startTime = Date.now();
+  const pollInterval = 500; // Check every 500ms
+  const supabase = getSupabaseServiceClient();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    // Check cache first (fastest)
+    const cached = await getCachedSearchResultById(searchId);
+    if (cached && cached.status === "completed") {
+      return cached;
+    }
+
+    // Check DB status
+    const { data: search } = await supabase
+      .from("searches")
+      .select("id, status, error_message")
+      .eq("id", searchId)
+      .single();
+
+    if (!search) {
+      return null;
+    }
+
+    if (search.status === "completed") {
+      // Try to fetch from cache again (might have been written while we checked)
+      const cachedAfter = await getCachedSearchResultById(searchId);
+      if (cachedAfter) {
+        return cachedAfter;
+      }
+
+      // If not in cache, assemble from DB (fallback)
+      return await assembleSearchResultFromDB(searchId, supabase);
+    }
+
+    if (search.status === "failed") {
+      // Return a failed result
+      return {
+        searchId,
+        status: "failed",
+        topic: "",
+        tags: [],
+        timeRange: "month",
+        minUpvotes: 0,
+        sortBy: "relevance",
+        painPoints: [],
+        quotes: [],
+        ...(search.error_message && { errorMessage: search.error_message }),
+      } as SearchResult;
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  }
+
+  return null;
+}
+
+/**
+ * Assemble SearchResult from database tables (fallback when cache misses)
+ */
+async function assembleSearchResultFromDB(
+  searchId: string,
+  supabase: ReturnType<typeof getSupabaseServiceClient>
+): Promise<SearchResult | null> {
+  try {
+    // Fetch search row
+    const { data: search } = await supabase
+      .from("searches")
+      .select("*")
+      .eq("id", searchId)
+      .single();
+
+    if (!search) return null;
+
+    // Fetch search_results
+    const { data: searchResults } = await supabase
+      .from("search_results")
+      .select("*")
+      .eq("search_id", searchId)
+      .single();
+
+    // Fetch pain_points
+    const { data: painPoints } = await supabase
+      .from("pain_points")
+      .select("*")
+      .eq("search_id", searchId);
+
+    // Fetch quotes (join through pain_points)
+    const painPointIds = (painPoints || []).map((pp) => pp.id);
+    const { data: quotes } = painPointIds.length > 0
+      ? await supabase
+          .from("pain_point_quotes")
+          .select("*")
+          .in("pain_point_id", painPointIds)
+      : { data: [] };
+
+    // Fetch AI analysis
+    const { data: analysis } = await supabase
+      .from("ai_analyses")
+      .select("*")
+      .eq("search_id", searchId)
+      .single();
+
+    // Assemble result
+    const result: SearchResult = {
+      searchId: search.id,
+      status: search.status as "pending" | "processing" | "completed" | "failed",
+      topic: search.topic,
+      tags: Array.isArray(search.subreddits) ? (search.subreddits as string[]) : [],
+      timeRange: search.time_range as "week" | "month" | "year" | "all",
+      minUpvotes: search.min_upvotes,
+      sortBy: search.sort_by as "relevance" | "upvotes" | "recency",
+      totalMentions: searchResults?.total_mentions ?? undefined,
+      totalPostsConsidered: searchResults?.total_posts_considered ?? undefined,
+      totalCommentsConsidered: searchResults?.total_comments_considered ?? undefined,
+      sourceTags: searchResults?.source_tags ?? undefined,
+      painPoints: (painPoints || []).map((pp) => ({
+        id: pp.id,
+        searchId: pp.search_id,
+        title: pp.title,
+        sourceTag: pp.subreddit, // Using subreddit column for HN tag
+        mentionsCount: pp.mentions_count,
+        severityScore: pp.severity_score ? Number(pp.severity_score) : undefined,
+      })),
+      quotes: (quotes || []).map((q) => ({
+        id: q.id,
+        painPointId: q.pain_point_id,
+        quoteText: q.quote_text,
+        authorHandle: q.author_handle,
+        upvotes: q.upvotes,
+        permalink: q.permalink,
+      })),
+      analysis: analysis
+        ? {
+            summary: analysis.summary,
+            problemClusters: Array.isArray(analysis.problem_clusters)
+              ? analysis.problem_clusters
+              : [],
+            productIdeas: Array.isArray(analysis.product_ideas)
+              ? analysis.product_ideas
+              : [],
+            model: analysis.model ?? undefined,
+            tokensUsed: analysis.tokens_used ?? undefined,
+          }
+        : undefined,
+    };
+
+    return SearchResultSchema.parse(result);
+  } catch (error) {
+    console.error("[assembleSearchResultFromDB] Failed to assemble result", error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -103,6 +290,12 @@ export async function POST(request: NextRequest) {
     // 2) If a recent searchId exists for this searchKey, reuse it
     const existingSearchId = await getSearchIdForKey(searchKey);
     if (existingSearchId) {
+      // Check cache first
+      const cachedById = await getCachedSearchResultById(existingSearchId);
+      if (cachedById && cachedById.status === "completed") {
+        return NextResponse.json(cachedById, { status: 200 });
+      }
+
       const { data: existingSearch } = await supabase
         .from("searches")
         .select("id, status")
@@ -110,6 +303,12 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (existingSearch) {
+        // If still processing, trigger edge function again (idempotent)
+        if (existingSearch.status === "processing" || existingSearch.status === "pending") {
+          await triggerEdgeFunction(existingSearchId).catch((err) => {
+            console.error("Failed to trigger edge function for existing search", err);
+          });
+        }
         return NextResponse.json(
           {
             searchId: existingSearch.id,
@@ -125,10 +324,7 @@ export async function POST(request: NextRequest) {
       .from("searches")
       .insert({
         topic: parsed.topic.toLowerCase(),
-        subreddits:
-          parsed.subreddits && parsed.subreddits.length > 0
-            ? parsed.subreddits
-            : null,
+        subreddits: parsed.tags && parsed.tags.length > 0 ? parsed.tags : null,
         time_range: parsed.timeRange,
         min_upvotes: parsed.minUpvotes,
         sort_by: parsed.sortBy,
@@ -150,10 +346,24 @@ export async function POST(request: NextRequest) {
       console.error("Failed to set searchKey mapping in Redis", err);
     });
 
+    // 4) Trigger the edge function to start processing
+    await triggerEdgeFunction(data.id).catch((err) => {
+      console.error("Failed to trigger edge function", err);
+      // Don't fail the request if edge function trigger fails
+    });
+
+    // 5) Short-poll for results (up to 8 seconds)
+    const pollResult = await shortPollForResults(data.id, 8000);
+    
+    if (pollResult && pollResult.status === "completed") {
+      return NextResponse.json(pollResult, { status: 200 });
+    }
+
+    // Return processing status if not ready yet
     return NextResponse.json(
       {
         searchId: data.id,
-        status: data.status,
+        status: pollResult?.status || "processing",
       },
       { status: 202 }
     );

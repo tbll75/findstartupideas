@@ -29,7 +29,8 @@ create table if not exists public.search_results (
   total_mentions integer,
   total_posts_considered integer,
   total_comments_considered integer,
-  source_subreddits text[]
+  source_subreddits text[],
+  source_tags text[]
 );
 
 create table if not exists public.pain_points (
@@ -104,7 +105,8 @@ select
   sr.total_mentions,
   sr.total_posts_considered,
   sr.total_comments_considered,
-  sr.source_subreddits
+  sr.source_subreddits,
+  sr.source_tags
 from public.searches s
 left join public.search_results sr on sr.search_id = s.id;
 

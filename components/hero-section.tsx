@@ -61,12 +61,12 @@ export function HeroSection() {
             Mine real pain points
             <br />
             <span className="text-primary relative">
-              from Reddit
+              from Hacker News
               <span
                 className="absolute inset-0 text-primary blur-lg opacity-30"
                 aria-hidden="true"
               >
-                from Reddit
+                from Hacker News
               </span>
             </span>
           </h1>
@@ -79,7 +79,7 @@ export function HeroSection() {
           >
             Discover validated product ideas, customer complaints, and market
             opportunities by analyzing authentic conversations happening right
-            now across thousands of subreddits.
+            now across the Hacker News community.
           </p>
 
           {/* <div

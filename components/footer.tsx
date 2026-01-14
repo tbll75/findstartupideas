@@ -15,8 +15,8 @@ export function Footer() {
           <div className="md:col-span-2">
             <Logo />
             <p className="mt-5 text-sm text-muted-foreground max-w-sm leading-relaxed">
-              Transform Reddit conversations into actionable market insights. Discover pain points, validate ideas, and
-              build products people actually want.
+              Transform Hacker News conversations into actionable market insights. Discover pain points, validate ideas,
+              and build products people actually want.
             </p>
             <div className="flex items-center gap-2 mt-8">
               {[

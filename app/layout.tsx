@@ -21,9 +21,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Reminer — Reddit Pain Point Miner",
+  title: "Reminer — Hacker News Pain Point Miner",
   description:
-    "Discover real customer complaints, validated product ideas, and market opportunities by mining Reddit discussions. Turn conversations into actionable insights.",
+    "Discover real customer complaints, validated product ideas, and market opportunities by mining Hacker News discussions. Turn conversations into actionable insights.",
 };
 
 export const viewport: Viewport = {
