@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import { getCachedSearchResultById } from "@/lib/cache";
-import { SearchResultSchema, type SearchResult } from "@/lib/validation";
+import {
+  SearchResultSchema,
+  type SearchResult,
+  hnTagsEnum,
+} from "@/lib/validation";
 
 /**
  * Assemble SearchResult from database tables (fallback when cache misses)
@@ -35,12 +40,13 @@ async function assembleSearchResultFromDB(
 
     // Fetch quotes (join through pain_points)
     const painPointIds = (painPoints || []).map((pp) => pp.id);
-    const { data: quotes } = painPointIds.length > 0
-      ? await supabase
-          .from("pain_point_quotes")
-          .select("*")
-          .in("pain_point_id", painPointIds)
-      : { data: [] };
+    const { data: quotes } =
+      painPointIds.length > 0
+        ? await supabase
+            .from("pain_point_quotes")
+            .select("*")
+            .in("pain_point_id", painPointIds)
+        : { data: [] };
 
     // Fetch AI analysis
     const { data: analysis } = await supabase
@@ -50,17 +56,30 @@ async function assembleSearchResultFromDB(
       .single();
 
     // Assemble result
+    // Validate and filter tags to ensure they match the HN tags enum
+    const validTags = Array.isArray(search.subreddits)
+      ? search.subreddits.filter(
+          (tag: unknown): tag is z.infer<typeof hnTagsEnum> =>
+            typeof tag === "string" && hnTagsEnum.safeParse(tag).success
+        )
+      : [];
+
     const result: SearchResult = {
       searchId: search.id,
-      status: search.status as "pending" | "processing" | "completed" | "failed",
+      status: search.status as
+        | "pending"
+        | "processing"
+        | "completed"
+        | "failed",
       topic: search.topic,
-      tags: Array.isArray(search.subreddits) ? (search.subreddits as string[]) : [],
+      tags: validTags,
       timeRange: search.time_range as "week" | "month" | "year" | "all",
       minUpvotes: search.min_upvotes,
       sortBy: search.sort_by as "relevance" | "upvotes" | "recency",
       totalMentions: searchResults?.total_mentions ?? undefined,
       totalPostsConsidered: searchResults?.total_posts_considered ?? undefined,
-      totalCommentsConsidered: searchResults?.total_comments_considered ?? undefined,
+      totalCommentsConsidered:
+        searchResults?.total_comments_considered ?? undefined,
       sourceTags: searchResults?.source_tags ?? undefined,
       painPoints: (painPoints || []).map((pp) => ({
         id: pp.id,
@@ -68,7 +87,9 @@ async function assembleSearchResultFromDB(
         title: pp.title,
         sourceTag: pp.subreddit, // Using subreddit column for HN tag
         mentionsCount: pp.mentions_count,
-        severityScore: pp.severity_score ? Number(pp.severity_score) : undefined,
+        severityScore: pp.severity_score
+          ? Number(pp.severity_score)
+          : undefined,
       })),
       quotes: (quotes || []).map((q) => ({
         id: q.id,
@@ -95,7 +116,10 @@ async function assembleSearchResultFromDB(
 
     return SearchResultSchema.parse(result);
   } catch (error) {
-    console.error("[assembleSearchResultFromDB] Failed to assemble result", error);
+    console.error(
+      "[assembleSearchResultFromDB] Failed to assemble result",
+      error
+    );
     return null;
   }
 }

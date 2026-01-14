@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ZodError } from "zod";
-import { SearchRequestSchema, type SearchRequest, SearchResultSchema, type SearchResult } from "@/lib/validation";
+import { ZodError, z } from "zod";
+import { SearchRequestSchema, type SearchRequest, SearchResultSchema, type SearchResult, hnTagsEnum } from "@/lib/validation";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import {
   buildSearchKey,
@@ -218,11 +218,18 @@ async function assembleSearchResultFromDB(
       .single();
 
     // Assemble result
+    // Validate and filter tags to ensure they match the HN tags enum
+    const validTags = Array.isArray(search.subreddits)
+      ? search.subreddits.filter((tag: unknown): tag is z.infer<typeof hnTagsEnum> =>
+          typeof tag === "string" && hnTagsEnum.safeParse(tag).success
+        )
+      : [];
+
     const result: SearchResult = {
       searchId: search.id,
       status: search.status as "pending" | "processing" | "completed" | "failed",
       topic: search.topic,
-      tags: Array.isArray(search.subreddits) ? (search.subreddits as string[]) : [],
+      tags: validTags,
       timeRange: search.time_range as "week" | "month" | "year" | "all",
       minUpvotes: search.min_upvotes,
       sortBy: search.sort_by as "relevance" | "upvotes" | "recency",

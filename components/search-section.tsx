@@ -37,7 +37,20 @@ const popularSearches = [
   "Productivity",
 ];
 
-const mockSearchResults = [
+type SearchResultItem = {
+  id: number;
+  painTitle: string;
+  mentions: number;
+  tag: string;
+  quotes: Array<{
+    text: string;
+    upvotes: number;
+    author: string;
+    permalink?: string;
+  }>;
+};
+
+const mockSearchResults: SearchResultItem[] = [
   {
     id: 1,
     painTitle:
@@ -140,7 +153,7 @@ export function SearchSection() {
   const [minUpvotes, setMinUpvotes] = useState("10");
   const [sortBy, setSortBy] = useState("relevance");
   const [searchResults, setSearchResults] = useState<
-    typeof mockSearchResults | null
+    SearchResultItem[] | null
   >(null);
   const [searchId, setSearchId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -192,7 +205,7 @@ export function SearchSection() {
   /**
    * Transform SearchResult to UI format
    */
-  const transformSearchResult = useCallback((result: SearchResult): typeof mockSearchResults => {
+  const transformSearchResult = useCallback((result: SearchResult): SearchResultItem[] => {
     // Group quotes by pain point
     const quotesByPainPoint = new Map<string, Array<{
       text: string;
