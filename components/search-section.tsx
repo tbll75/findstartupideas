@@ -141,6 +141,8 @@ export function SearchSection() {
   const [searchResults, setSearchResults] = useState<
     typeof mockSearchResults | null
   >(searchParams.get("q") ? mockSearchResults : null);
+  const [searchId, setSearchId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(!!searchParams.get("q"));
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -184,14 +186,14 @@ export function SearchSection() {
     runStage();
   }, []);
 
-  const handleSearch = useCallback(() => {
+  const handleSearch = useCallback(async () => {
     if (query.length < 2) return;
 
     setIsLoading(true);
     setShowResults(false);
+    setErrorMessage(null);
     simulateProgress();
 
-    // Update URL with search query
     const params = new URLSearchParams();
     params.set("q", query);
     if (selectedSubreddits.length > 0)
@@ -202,8 +204,35 @@ export function SearchSection() {
 
     router.push(`?${params.toString()}`, { scroll: false });
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topic: query,
+          subreddits: selectedSubreddits,
+          timeRange,
+          minUpvotes: Number(minUpvotes),
+          sortBy,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message =
+          errorData?.error || "Something went wrong starting your search.";
+        setErrorMessage(message);
+        return;
+      }
+
+      const data: { searchId: string; status: string } = await response.json();
+
+      setSearchId(data.searchId);
+
+      // While the backend worker pipeline is not wired yet,
+      // we still display the mock results so the UX matches.
       setLoadingProgress(100);
       setTimeout(() => {
         setIsLoading(false);
@@ -211,7 +240,14 @@ export function SearchSection() {
         setShowResults(true);
         setLoadingProgress(0);
       }, 200);
-    }, 2200);
+    } catch (error) {
+      console.error("Error calling /api/search:", error);
+      setErrorMessage("Unable to reach the search service. Please try again.");
+    } finally {
+      if (loadingProgress < 100) {
+        setLoadingProgress(100);
+      }
+    }
   }, [
     query,
     selectedSubreddits,
@@ -220,6 +256,7 @@ export function SearchSection() {
     sortBy,
     router,
     simulateProgress,
+    loadingProgress,
   ]);
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -415,7 +452,7 @@ export function SearchSection() {
 
         {/* Advanced Options Accordion */}
         <div className="mt-8">
-          <Accordion type="single" collapsible className="w-full">
+          <Accordion className="w-full">
             <AccordionItem value="options" className="border-0">
               <AccordionTrigger className="group flex items-center gap-2 py-3 px-5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm">
                 <Filter className="w-4 h-4" />
@@ -587,6 +624,13 @@ export function SearchSection() {
 
         {showResults && searchResults && (
           <div className="mt-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Error message */}
+            {errorMessage && (
+              <div className="mt-8 px-4 py-3 rounded-xl bg-destructive/5 border border-destructive/20 text-sm text-destructive">
+                {errorMessage}
+              </div>
+            )}
+
             {/* Results header */}
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
