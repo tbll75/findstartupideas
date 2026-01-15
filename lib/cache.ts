@@ -104,7 +104,7 @@ export async function redisDel(key: string): Promise<number> {
  * High-level cache helpers for search results and searchKey mapping.
  */
 
-const DEFAULT_RESULT_TTL_SECONDS = 60 * 30; // 30 minutes
+const DEFAULT_RESULT_TTL_SECONDS = 60 * 60 * 2; // 30 minutes
 
 function resultCacheKeyById(searchId: string): string {
   return `search:result:id:${searchId}`;

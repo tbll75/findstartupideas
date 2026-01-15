@@ -107,7 +107,7 @@ const REDIS_URL = Deno.env.get("UPSTASH_REDIS_REST_URL") ?? "";
 const REDIS_TOKEN = Deno.env.get("UPSTASH_REDIS_REST_TOKEN") ?? "";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash-lite";
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
 
 // --- Utility: Retry with exponential backoff ----------------------
 
@@ -172,7 +172,7 @@ function redisKeySearchMap(searchKey: string): string {
 async function redisSet(
   key: string,
   value: unknown,
-  ttlSeconds = 60 * 30
+  ttlSeconds = 60 * 60 * 2
 ): Promise<void> {
   if (!REDIS_URL || !REDIS_TOKEN) {
     console.warn("[redisSet] Redis not configured, skipping cache");
