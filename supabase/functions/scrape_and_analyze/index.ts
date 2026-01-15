@@ -892,19 +892,18 @@ serve(async (req) => {
               if (foundComment) break;
             }
 
-            quotes.push({
-              id: crypto.randomUUID(),
-              pain_point_id: painPoint.id,
-              quote_text:
-                typeof example === "string"
-                  ? example.slice(0, 800)
-                  : stripHtml(foundComment?.text ?? "").slice(0, 800),
-              author_handle: foundComment?.author ?? null,
-              upvotes: foundComment?.points ?? 0,
-              permalink:
-                foundComment?.permalink ??
-                `https://news.ycombinator.com/item?id=${foundStory?.id}`,
-            });
+            // Only create quote if we found an actual matching comment
+            // This ensures the permalink points to a real comment, not just a story
+            if (foundComment && foundComment.permalink) {
+              quotes.push({
+                id: crypto.randomUUID(),
+                pain_point_id: painPoint.id,
+                quote_text: stripHtml(foundComment.text ?? "").slice(0, 800),
+                author_handle: foundComment.author ?? null,
+                upvotes: foundComment.points ?? 0,
+                permalink: foundComment.permalink,
+              });
+            }
           }
         }
       }

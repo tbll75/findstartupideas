@@ -828,7 +828,13 @@ export function SearchSection() {
                       {result.quotes.map((quote, qIndex) => (
                         <div
                           key={qIndex}
-                          className="relative pl-4 py-3 rounded-xl transition-all duration-200 hover:bg-secondary/30"
+                          className={cn(
+                            "relative pl-4 py-3 rounded-xl transition-all duration-200",
+                            quote.permalink &&
+                              !quote.permalink.includes("undefined")
+                              ? "hover:bg-secondary/40 cursor-pointer"
+                              : "hover:bg-secondary/30"
+                          )}
                           style={{
                             background:
                               "linear-gradient(to right, rgba(0,0,0,0.02), transparent)",
@@ -846,33 +852,60 @@ export function SearchSection() {
                           <div className="flex items-start gap-2">
                             <Quote className="w-4 h-4 text-primary/40 flex-shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground/90 leading-relaxed italic">
-                                "{quote.text}"
-                              </p>
+                              {quote.permalink &&
+                              !quote.permalink.includes("undefined") ? (
+                                <a
+                                  href={quote.permalink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block group"
+                                  title="View on Hacker News"
+                                >
+                                  <p className="text-sm text-foreground/90 leading-relaxed italic cursor-pointer hover:text-primary transition-colors">
+                                    "{quote.text}"
+                                  </p>
+                                </a>
+                              ) : (
+                                <p className="text-sm text-foreground/90 leading-relaxed italic">
+                                  "{quote.text}"
+                                </p>
+                              )}
                               <div className="flex items-center gap-3 mt-2">
-                                {quote.author && (
-                                  <a
-                                    href={
-                                      quote.permalink ||
-                                      `https://news.ycombinator.com/user?id=${quote.author}`
-                                    }
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                                  >
-                                    {quote.author}
-                                  </a>
-                                )}
-                                {quote.permalink && (
-                                  <a
-                                    href={quote.permalink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                )}
+                                {quote.author ? (
+                                  quote.author !== "Anonymous" ? (
+                                    <a
+                                      href={
+                                        quote.permalink &&
+                                        !quote.permalink.includes("undefined")
+                                          ? quote.permalink
+                                          : `https://news.ycombinator.com/user?id=${quote.author}`
+                                      }
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {quote.author}
+                                    </a>
+                                  ) : (
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {quote.author}
+                                    </span>
+                                  )
+                                ) : null}
+                                {quote.permalink &&
+                                  !quote.permalink.includes("undefined") && (
+                                    <a
+                                      href={quote.permalink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                                      title="View on Hacker News"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
                               </div>
                             </div>
                           </div>
