@@ -70,48 +70,25 @@ export function SearchSection() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(3);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasRestoredFromUrlRef = useRef(false);
 
   const filteredSuggestions = popularSearches.filter((s) =>
     s.toLowerCase().includes(query.toLowerCase())
   );
 
-  const simulateProgress = useCallback(() => {
-    setLoadingProgress(0);
-    const stages = [
-      { target: 30, duration: 300 },
-      { target: 60, duration: 500 },
-      { target: 85, duration: 800 },
-      { target: 95, duration: 600 },
-    ];
-
-    let currentStage = 0;
-    const runStage = () => {
-      if (currentStage >= stages.length) return;
-
-      const { target, duration } = stages[currentStage];
-      const startProgress =
-        currentStage === 0 ? 0 : stages[currentStage - 1].target;
-      const startTime = Date.now();
-
-      const animate = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-        setLoadingProgress(startProgress + (target - startProgress) * eased);
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          currentStage++;
-          runStage();
-        }
-      };
-      requestAnimationFrame(animate);
-    };
-    runStage();
+  /**
+   * Progress handling that reflects backend state:
+   * - Starts at a small value when a search begins
+   * - Increases slightly on each poll while processing
+   * - Jumps to 100% when results are completed
+   */
+  const bumpProgress = useCallback((increment = 5, max = 95) => {
+    setLoadingProgress((prev) => {
+      if (prev >= max) return prev;
+      return Math.min(prev + increment, max);
+    });
   }, []);
 
   /**
@@ -171,6 +148,10 @@ export function SearchSection() {
 
       const poll = async (): Promise<void> => {
         if (attempts >= maxAttempts) {
+          if (pollingIntervalRef.current) {
+            clearTimeout(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
           setIsPolling(false);
           setErrorMessage(
             "Search is taking longer than expected. Please refresh the page later."
@@ -183,6 +164,9 @@ export function SearchSection() {
         attempts++;
 
         try {
+          // Nudge progress upward while we wait on each successful poll
+          bumpProgress(4, 95);
+
           const response = await fetch(`/api/search-status?searchId=${id}`);
 
           if (!response.ok) {
@@ -193,12 +177,17 @@ export function SearchSection() {
 
           // Check if we got a full SearchResult
           if (data.status === "completed" && data.painPoints) {
+            if (pollingIntervalRef.current) {
+              clearTimeout(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
             setIsPolling(false);
             setIsLoading(false);
             setLoadingProgress(100);
 
             const transformed = transformSearchResult(data as SearchResult);
             setSearchResults(transformed);
+            setVisibleCount(Math.min(5, transformed.length));
             setShowResults(true);
 
             setTimeout(() => {
@@ -209,6 +198,10 @@ export function SearchSection() {
 
           // Check if failed
           if (data.status === "failed") {
+            if (pollingIntervalRef.current) {
+              clearTimeout(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
             setIsPolling(false);
             setIsLoading(false);
             setLoadingProgress(0);
@@ -220,10 +213,15 @@ export function SearchSection() {
 
           // Still processing, poll again
           if (data.status === "processing" || data.status === "pending") {
-            setTimeout(poll, 2000); // Poll every 2 seconds
+            const timeoutId = setTimeout(poll, 2000); // Poll every 2 seconds
+            pollingIntervalRef.current = timeoutId;
           }
         } catch (error) {
           console.error("Error polling search status:", error);
+          if (pollingIntervalRef.current) {
+            clearTimeout(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
           setIsPolling(false);
           setIsLoading(false);
           setLoadingProgress(0);
@@ -233,7 +231,7 @@ export function SearchSection() {
 
       poll();
     },
-    [transformSearchResult]
+    [bumpProgress, transformSearchResult]
   );
 
   /**
@@ -242,142 +240,148 @@ export function SearchSection() {
   useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
+        clearTimeout(pollingIntervalRef.current);
       }
     };
   }, []);
 
   /**
-   * Restore search state from URL params on mount
+   * Keep search state in sync with URL params
+   * and trigger searches when the URL changes.
    */
   useEffect(() => {
-    // Only restore once on initial mount to avoid infinite loops
-    if (hasRestoredFromUrlRef.current) {
-      return;
-    }
-
     const urlQuery = searchParams.get("q");
     const urlTags = searchParams.get("tags");
     const urlTime = searchParams.get("time");
     const urlUpvotes = searchParams.get("upvotes");
     const urlSort = searchParams.get("sort");
 
-    // If there's a query in the URL, restore the state and perform the search
-    if (urlQuery && urlQuery.length >= 2) {
-      setQuery(urlQuery);
+    // No valid query in URL – reset search state
+    if (!urlQuery || urlQuery.length < 2) {
+      setQuery(urlQuery || "");
+      setShowResults(false);
+      setSearchResults(null);
+      setErrorMessage(null);
+      setIsLoading(false);
+      setLoadingProgress(0);
+      return;
+    }
 
-      // Restore filter state from URL
-      if (urlTags) {
-        setSelectedTags(urlTags.split(",").filter(Boolean));
-      }
-      if (urlTime) {
-        setTimeRange(urlTime);
-      }
-      if (urlUpvotes) {
-        setMinUpvotes(urlUpvotes);
-      }
-      if (urlSort) {
-        setSortBy(urlSort);
-      }
+    // Sync local state with URL
+    setQuery(urlQuery);
+    setSelectedTags(urlTags ? urlTags.split(",").filter(Boolean) : []);
+    if (urlTime) setTimeRange(urlTime);
+    if (urlUpvotes) setMinUpvotes(urlUpvotes);
+    if (urlSort) setSortBy(urlSort);
 
-      // Mark as restored and trigger search
-      hasRestoredFromUrlRef.current = true;
+    // Clear any existing polling when URL-driven search changes
+    if (pollingIntervalRef.current) {
+      clearTimeout(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setIsPolling(false);
+    setSearchId(null);
 
-      // Perform the search (backend will check cache first)
-      const performRestoreSearch = async () => {
-        setIsLoading(true);
-        setShowResults(false);
-        setErrorMessage(null);
-        simulateProgress();
+    let cancelled = false;
 
-        const searchPayload = {
-          topic: urlQuery,
-          tags: urlTags ? urlTags.split(",").filter(Boolean) : [],
-          timeRange: urlTime || "month",
-          minUpvotes: Number(urlUpvotes || "10"),
-          sortBy: urlSort || "relevance",
-        };
+    const performSearchFromUrl = async () => {
+      setIsLoading(true);
+      setShowResults(false);
+      setErrorMessage(null);
+      setLoadingProgress(10);
 
-        try {
-          const response = await fetch("/api/search", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(searchPayload),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            const message =
-              errorData?.error || "Something went wrong starting your search.";
-            setErrorMessage(message);
-            setIsLoading(false);
-            setLoadingProgress(0);
-            return;
-          }
-
-          const data = await response.json();
-
-          // Check if we got a full SearchResult (cached or completed quickly)
-          if (data.status === "completed" && data.painPoints) {
-            setIsLoading(false);
-            setLoadingProgress(100);
-
-            const transformed = transformSearchResult(data as SearchResult);
-            setSearchResults(transformed);
-            setShowResults(true);
-            setSearchId(data.searchId);
-
-            setTimeout(() => {
-              setLoadingProgress(0);
-            }, 300);
-            return;
-          }
-
-          // Otherwise, we got a searchId and status
-          const restoredSearchId = data.searchId;
-          const status = data.status;
-
-          if (!restoredSearchId) {
-            setIsLoading(false);
-            setLoadingProgress(0);
-            setErrorMessage("Invalid response from server.");
-            return;
-          }
-
-          setSearchId(restoredSearchId);
-
-          // If processing, start polling
-          if (status === "processing" || status === "pending") {
-            setIsPolling(true);
-            await pollSearchStatus(restoredSearchId);
-          } else if (status === "failed") {
-            setIsLoading(false);
-            setLoadingProgress(0);
-            setErrorMessage(
-              data.errorMessage || "Search failed. Please try again."
-            );
-          }
-        } catch (error) {
-          console.error("Error restoring search from URL:", error);
-          setErrorMessage("Unable to restore search. Please try again.");
-          setIsLoading(false);
-          setLoadingProgress(0);
-        }
+      const searchPayload = {
+        topic: urlQuery,
+        tags: urlTags ? urlTags.split(",").filter(Boolean) : [],
+        timeRange: urlTime || "month",
+        minUpvotes: Number(urlUpvotes || "10"),
+        sortBy: urlSort || "relevance",
       };
 
-      performRestoreSearch();
-    } else {
-      hasRestoredFromUrlRef.current = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+      try {
+        const response = await fetch("/api/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(searchPayload),
+        });
+
+        if (!response.ok) {
+          if (cancelled) return;
+          const errorData = await response.json().catch(() => null);
+          const message =
+            errorData?.error || "Something went wrong starting your search.";
+          setErrorMessage(message);
+          setIsLoading(false);
+          setLoadingProgress(0);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        // Check if we got a full SearchResult (cached or completed quickly)
+        if (data.status === "completed" && data.painPoints) {
+          setIsLoading(false);
+          setLoadingProgress(100);
+
+          const transformed = transformSearchResult(data as SearchResult);
+          setSearchResults(transformed);
+          setVisibleCount(Math.min(5, transformed.length));
+          setShowResults(true);
+          setSearchId(data.searchId);
+
+          setTimeout(() => {
+            setLoadingProgress(0);
+          }, 300);
+          return;
+        }
+
+        // Otherwise, we got a searchId and status
+        const restoredSearchId = data.searchId;
+        const status = data.status;
+
+        if (!restoredSearchId) {
+          setIsLoading(false);
+          setLoadingProgress(0);
+          setErrorMessage("Invalid response from server.");
+          return;
+        }
+
+        setSearchId(restoredSearchId);
+
+        // If processing, start polling
+        if (status === "processing" || status === "pending") {
+          setIsPolling(true);
+          await pollSearchStatus(restoredSearchId);
+        } else if (status === "failed") {
+          setIsLoading(false);
+          setLoadingProgress(0);
+          setErrorMessage(
+            data.errorMessage || "Search failed. Please try again."
+          );
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Error restoring search from URL:", error);
+        setErrorMessage("Unable to restore search. Please try again.");
+        setIsLoading(false);
+        setLoadingProgress(0);
+      }
+    };
+
+    performSearchFromUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, pollSearchStatus, transformSearchResult]);
 
   const handleSearch = useCallback(async () => {
     if (query.length < 2) return;
 
-    // Check if we're searching for the exact same thing (avoid unnecessary refetch)
     const currentParams = new URLSearchParams();
     currentParams.set("q", query);
     if (selectedTags.length > 0)
@@ -387,120 +391,9 @@ export function SearchSection() {
     if (sortBy !== "relevance") currentParams.set("sort", sortBy);
 
     const currentUrlParams = currentParams.toString();
-    const existingUrlParams = searchParams.toString();
-
-    // If the URL params match exactly and we already have results, don't refetch
-    if (
-      currentUrlParams === existingUrlParams &&
-      showResults &&
-      searchResults
-    ) {
-      return;
-    }
-
-    setIsLoading(true);
-    setShowResults(false);
-    setErrorMessage(null);
-    setIsPolling(false);
-    setSearchId(null);
-
-    // Clear any existing polling
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-
-    simulateProgress();
 
     router.push(`?${currentUrlParams}`, { scroll: false });
-
-    try {
-      const response = await fetch("/api/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          topic: query,
-          tags: selectedTags,
-          timeRange,
-          minUpvotes: Number(minUpvotes),
-          sortBy,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        const message =
-          errorData?.error || "Something went wrong starting your search.";
-        setErrorMessage(message);
-        setIsLoading(false);
-        setLoadingProgress(0);
-        return;
-      }
-
-      const data = await response.json();
-
-      // Check if we got a full SearchResult (cached or completed quickly)
-      if (data.status === "completed" && data.painPoints) {
-        setIsLoading(false);
-        setLoadingProgress(100);
-
-        const transformed = transformSearchResult(data as SearchResult);
-        setSearchResults(transformed);
-        setShowResults(true);
-        setSearchId(data.searchId);
-
-        setTimeout(() => {
-          setLoadingProgress(0);
-        }, 300);
-        return;
-      }
-
-      // Otherwise, we got a searchId and status
-      const searchId = data.searchId;
-      const status = data.status;
-
-      if (!searchId) {
-        setIsLoading(false);
-        setLoadingProgress(0);
-        setErrorMessage("Invalid response from server.");
-        return;
-      }
-
-      setSearchId(searchId);
-
-      // If processing, start polling
-      if (status === "processing" || status === "pending") {
-        setIsPolling(true);
-        await pollSearchStatus(searchId);
-      } else if (status === "failed") {
-        setIsLoading(false);
-        setLoadingProgress(0);
-        setErrorMessage(
-          data.errorMessage || "Search failed. Please try again."
-        );
-      }
-    } catch (error) {
-      console.error("Error calling /api/search:", error);
-      setErrorMessage("Unable to reach the search service. Please try again.");
-      setIsLoading(false);
-      setLoadingProgress(0);
-    }
-  }, [
-    query,
-    selectedTags,
-    timeRange,
-    minUpvotes,
-    sortBy,
-    router,
-    simulateProgress,
-    transformSearchResult,
-    pollSearchStatus,
-    searchParams,
-    showResults,
-    searchResults,
-  ]);
+  }, [query, selectedTags, timeRange, minUpvotes, sortBy, router]);
 
   const handleSuggestionClick = (suggestion: string) => {
     setQuery(suggestion);
@@ -659,12 +552,6 @@ export function SearchSection() {
               <AccordionTrigger className="group flex items-center gap-2 py-3 px-5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm">
                 <Filter className="w-4 h-4" />
                 <span>Advanced Options</span>
-                {/* <div className="ml-auto flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                    Customize your search
-                  </span>
-                  <ChevronDown className="w-4 h-4 transition-transform duration-300 group-data-[state=open]:rotate-180" />
-                </div> */}
               </AccordionTrigger>
               <AccordionContent className="pt-4 pb-2">
                 <div
@@ -869,7 +756,7 @@ export function SearchSection() {
 
             {/* Result Cards */}
             <div className="space-y-4">
-              {searchResults.map((result, index) => (
+              {searchResults.slice(0, visibleCount).map((result, index) => (
                 <div
                   key={result.id}
                   className="group relative rounded-2xl bg-card overflow-hidden transition-all duration-300 hover:-translate-y-1"
@@ -1015,17 +902,24 @@ export function SearchSection() {
             </div>
 
             {/* Load more button */}
-            <div className="flex justify-center pt-4">
-              <Button
-                variant="outline"
-                className="px-8 py-3 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 bg-transparent"
-              >
-                <span className="flex items-center gap-2">
-                  Load more results
-                  <ChevronDown className="w-4 h-4" />
-                </span>
-              </Button>
-            </div>
+            {searchResults.length > visibleCount && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  className="px-8 py-3 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 bg-transparent"
+                  onClick={() =>
+                    setVisibleCount((prev) =>
+                      Math.min(prev + 5, searchResults.length)
+                    )
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    Load more results
+                    <ChevronDown className="w-4 h-4" />
+                  </span>
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

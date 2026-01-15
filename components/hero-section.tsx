@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Star, Users, Sparkles, Zap } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export function HeroSection() {
   const [mounted, setMounted] = useState(false);
@@ -81,65 +81,6 @@ export function HeroSection() {
             opportunities by analyzing authentic conversations happening right
             now across the Hacker News community.
           </p>
-
-          {/* <div
-            className={`inline-flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-0 p-4 sm:p-2 rounded-2xl bg-gradient-to-b from-card/80 to-card border border-border/40 shadow-elevation-2 backdrop-blur-sm transition-all duration-700 delay-300 ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <div className="flex items-center gap-3 px-4 py-2">
-              <div className="flex -space-x-2.5">
-                {[1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className="w-9 h-9 rounded-full bg-gradient-to-br from-secondary to-muted border-2 border-card shadow-md ring-1 ring-border/20"
-                    style={{
-                      backgroundImage: `url(/placeholder.svg?height=36&width=36&query=professional headshot ${i})`,
-                      backgroundSize: "cover",
-                    }}
-                  />
-                ))}
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-orange-600 border-2 border-card shadow-md flex items-center justify-center ring-1 ring-primary/20">
-                  <span className="text-[10px] font-bold text-primary-foreground">
-                    +12k
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 text-sm">
-                <Users className="w-4 h-4 text-primary" />
-                <span className="font-semibold">12,847</span>
-                <span className="text-muted-foreground">users</span>
-              </div>
-            </div>
-
-            <div className="hidden sm:block w-px h-8 bg-gradient-to-b from-transparent via-border to-transparent" />
-
-            <div className="flex items-center gap-3 px-4 py-2">
-              <div className="flex items-center gap-0.5">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star
-                    key={i}
-                    className="w-4 h-4 fill-primary text-primary drop-shadow-sm"
-                    style={{
-                      filter: "drop-shadow(0 1px 2px rgba(234, 88, 12, 0.3))",
-                    }}
-                  />
-                ))}
-              </div>
-              <span className="text-sm">
-                <span className="font-semibold">4.9</span>
-                <span className="text-muted-foreground"> (2.4k reviews)</span>
-              </span>
-            </div>
-
-            <div className="hidden lg:flex items-center gap-2 px-4 py-2 border-l border-border/40">
-              <Zap className="w-4 h-4 text-primary" />
-              <span className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">50k+</span>{" "}
-                insights generated
-              </span>
-            </div>
-          </div> */}
         </div>
       </div>
     </section>

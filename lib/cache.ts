@@ -1,7 +1,7 @@
 import {
   SearchResult,
   SearchResultSchema,
-  SearchRequest,
+  buildSearchKey, // Import from validation.ts instead of duplicating
 } from "@/lib/validation";
 
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
@@ -18,6 +18,10 @@ type RedisCommandResult<T = unknown> = {
   error?: string;
 };
 
+/**
+ * Execute a Redis command via Upstash REST API
+ * Uses POST with JSON body to avoid URL length limits
+ */
 async function redisCommand<T = unknown>(
   command: string,
   ...args: (string | number)[]
@@ -26,37 +30,48 @@ async function redisCommand<T = unknown>(
     return { result: null, error: "Redis not configured" };
   }
 
-  const path =
-    "/" +
-    [command, ...args.map((arg) => encodeURIComponent(String(arg)))].join("/");
+  try {
+    // Use POST with command array to avoid URL length limits
+    const res = await fetch(`${REDIS_URL}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REDIS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([command, ...args]),
+    });
 
-  const res = await fetch(`${REDIS_URL}${path}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${REDIS_TOKEN}`,
-    },
-    cache: "no-store",
-  });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(`[redisCommand] ${command} failed: ${res.status} ${text}`);
+      return {
+        result: null,
+        error: `Redis request failed with ${res.status}: ${text}`,
+      };
+    }
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
+    const json = (await res.json().catch(() => null)) as { result: T } | null;
+
+    if (!json || typeof json.result === "undefined") {
+      console.error(`[redisCommand] ${command} returned malformed response`);
+      return { result: null, error: "Malformed Redis response" };
+    }
+
+    return { result: json.result };
+  } catch (error) {
+    console.error(`[redisCommand] ${command} threw error:`, error);
     return {
       result: null,
-      error: `Redis request failed with ${res.status}: ${text}`,
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
-
-  const json = (await res.json().catch(() => null)) as { result: T } | null;
-
-  if (!json || typeof json.result === "undefined") {
-    return { result: null, error: "Malformed Redis response" };
-  }
-
-  return { result: json.result };
 }
 
 export async function redisGet(key: string): Promise<string | null> {
-  const { result } = await redisCommand<string>("get", key);
+  const { result, error } = await redisCommand<string>("GET", key);
+  if (error) {
+    console.error(`[redisGet] Failed for key ${key}:`, error);
+  }
   return (result as string | null) ?? null;
 }
 
@@ -70,35 +85,19 @@ export async function redisSet(
     args.push("EX", ttlSeconds);
   }
 
-  const { result } = await redisCommand<"OK">("set", ...args);
+  const { result, error } = await redisCommand<"OK">("SET", ...args);
+  if (error) {
+    console.error(`[redisSet] Failed for key ${key}:`, error);
+  }
   return result === "OK";
 }
 
 export async function redisDel(key: string): Promise<number> {
-  const { result } = await redisCommand<number>("del", key);
+  const { result, error } = await redisCommand<number>("DEL", key);
+  if (error) {
+    console.error(`[redisDel] Failed for key ${key}:`, error);
+  }
   return typeof result === "number" ? result : 0;
-}
-
-/**
- * Compute a stable, deterministic search key from the normalized
- * search request parameters. This key is used both for:
- *  - Redis cache lookup
- *  - DB-level deduplication (if desired)
- */
-export function buildSearchKey(input: SearchRequest): string {
-  const topic = input.topic.trim().toLowerCase();
-  const tags = (input.tags ?? []).map((t) => t.toLowerCase()).sort();
-
-  const payload = {
-    topic,
-    tags,
-    timeRange: input.timeRange,
-    minUpvotes: input.minUpvotes,
-    sortBy: input.sortBy,
-  };
-
-  // Simple deterministic string key; no hashing to avoid Node-only deps.
-  return `searchKey:${JSON.stringify(payload)}`;
 }
 
 /**
@@ -119,6 +118,44 @@ function searchKeyMappingKey(searchKey: string): string {
   return `search:map:${searchKey}`;
 }
 
+/**
+ * Clean and validate analysis data before parsing
+ */
+function cleanAnalysisData(parsed: any): any {
+  if (parsed.analysis) {
+    // Filter out invalid problem clusters
+    if (Array.isArray(parsed.analysis.problemClusters)) {
+      parsed.analysis.problemClusters = parsed.analysis.problemClusters.filter(
+        (item: unknown) =>
+          item &&
+          typeof item === "object" &&
+          "title" in item &&
+          typeof item.title === "string" &&
+          item.title.length > 0 &&
+          "description" in item &&
+          typeof item.description === "string" &&
+          item.description.length > 0
+      );
+    }
+
+    // Filter out invalid product ideas
+    if (Array.isArray(parsed.analysis.productIdeas)) {
+      parsed.analysis.productIdeas = parsed.analysis.productIdeas.filter(
+        (item: unknown) =>
+          item &&
+          typeof item === "object" &&
+          "title" in item &&
+          typeof item.title === "string" &&
+          item.title.length > 0 &&
+          "description" in item &&
+          typeof item.description === "string" &&
+          item.description.length > 0
+      );
+    }
+  }
+  return parsed;
+}
+
 export async function getCachedSearchResultById(
   searchId: string
 ): Promise<SearchResult | null> {
@@ -128,39 +165,21 @@ export async function getCachedSearchResultById(
 
   try {
     const parsed = JSON.parse(raw);
-
-    // Clean up analysis arrays - filter out items missing required fields
-    if (parsed.analysis) {
-      if (Array.isArray(parsed.analysis.problemClusters)) {
-        parsed.analysis.problemClusters =
-          parsed.analysis.problemClusters.filter(
-            (item: unknown) =>
-              item &&
-              typeof item === "object" &&
-              "title" in item &&
-              typeof item.title === "string" &&
-              "description" in item &&
-              typeof item.description === "string"
-          );
-      }
-      if (Array.isArray(parsed.analysis.productIdeas)) {
-        parsed.analysis.productIdeas = parsed.analysis.productIdeas.filter(
-          (item: unknown) =>
-            item &&
-            typeof item === "object" &&
-            "title" in item &&
-            typeof item.title === "string" &&
-            "description" in item &&
-            typeof item.description === "string"
-        );
-      }
-    }
-
-    const validated = SearchResultSchema.parse(parsed);
+    const cleaned = cleanAnalysisData(parsed);
+    const validated = SearchResultSchema.parse(cleaned);
     return validated;
   } catch (error) {
-    console.error("[cache] Failed to parse cached search result by id", error);
-    await redisDel(key).catch(() => {});
+    console.error(
+      `[getCachedSearchResultById] Failed to parse cached result for ${searchId}`,
+      error
+    );
+    // Delete corrupted cache entry
+    await redisDel(key).catch((err) => {
+      console.error(
+        `[getCachedSearchResultById] Failed to delete corrupted cache:`,
+        err
+      );
+    });
     return null;
   }
 }
@@ -174,42 +193,21 @@ export async function getCachedSearchResultByKey(
 
   try {
     const parsed = JSON.parse(raw);
-
-    // Clean up analysis arrays - filter out items missing required fields
-    if (parsed.analysis) {
-      if (Array.isArray(parsed.analysis.problemClusters)) {
-        parsed.analysis.problemClusters =
-          parsed.analysis.problemClusters.filter(
-            (item: unknown) =>
-              item &&
-              typeof item === "object" &&
-              "title" in item &&
-              typeof item.title === "string" &&
-              "description" in item &&
-              typeof item.description === "string"
-          );
-      }
-      if (Array.isArray(parsed.analysis.productIdeas)) {
-        parsed.analysis.productIdeas = parsed.analysis.productIdeas.filter(
-          (item: unknown) =>
-            item &&
-            typeof item === "object" &&
-            "title" in item &&
-            typeof item.title === "string" &&
-            "description" in item &&
-            typeof item.description === "string"
-        );
-      }
-    }
-
-    const validated = SearchResultSchema.parse(parsed);
+    const cleaned = cleanAnalysisData(parsed);
+    const validated = SearchResultSchema.parse(cleaned);
     return validated;
   } catch (error) {
     console.error(
-      "[cache] Failed to parse cached search result by searchKey",
+      `[getCachedSearchResultByKey] Failed to parse cached result for key ${searchKey}`,
       error
     );
-    await redisDel(key).catch(() => {});
+    // Delete corrupted cache entry
+    await redisDel(key).catch((err) => {
+      console.error(
+        `[getCachedSearchResultByKey] Failed to delete corrupted cache:`,
+        err
+      );
+    });
     return null;
   }
 }
@@ -224,7 +222,7 @@ export async function setCachedSearchResult(
     const validated = SearchResultSchema.parse(result);
     const serialized = JSON.stringify(validated);
 
-    const ops: Promise<unknown>[] = [];
+    const ops: Promise<boolean>[] = [];
 
     ops.push(redisSet(resultCacheKeyById(searchId), serialized, ttlSeconds));
 
@@ -234,9 +232,22 @@ export async function setCachedSearchResult(
       );
     }
 
-    await Promise.allSettled(ops);
+    const results = await Promise.allSettled(ops);
+
+    // Log any failures
+    results.forEach((r, idx) => {
+      if (r.status === "rejected") {
+        console.error(
+          `[setCachedSearchResult] Failed to cache result (op ${idx}):`,
+          r.reason
+        );
+      }
+    });
   } catch (error) {
-    console.error("[cache] Failed to set cached search result", error);
+    console.error(
+      "[setCachedSearchResult] Failed to set cached search result",
+      error
+    );
   }
 }
 
@@ -247,13 +258,13 @@ export async function getSearchIdForKey(
   const raw = await redisGet(key);
   if (!raw) return null;
 
-  // The edge function stores searchId as JSON.stringify(searchId), so we need to parse it
   try {
+    // Try parsing as JSON first (new format from Edge Function)
     const parsed = JSON.parse(raw);
-    return typeof parsed === "string" ? parsed : raw;
+    return typeof parsed === "string" ? parsed : null;
   } catch {
-    // If parsing fails, return raw (might be stored as plain string)
-    return raw;
+    // Fallback: treat as plain string (old format)
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
   }
 }
 
@@ -263,10 +274,22 @@ export async function setSearchKeyForId(
   ttlSeconds: number = DEFAULT_RESULT_TTL_SECONDS
 ): Promise<void> {
   try {
-    await redisSet(searchKeyMappingKey(searchKey), searchId, ttlSeconds);
+    // Store as plain string for simplicity (Edge Function expects this)
+    const success = await redisSet(
+      searchKeyMappingKey(searchKey),
+      searchId,
+      ttlSeconds
+    );
+
+    if (!success) {
+      console.error(
+        `[setSearchKeyForId] Failed to set mapping for ${searchKey}`
+      );
+    }
   } catch (error) {
-    console.error("[cache] Failed to set searchKey mapping", error);
+    console.error("[setSearchKeyForId] Failed to set searchKey mapping", error);
   }
 }
 
-export { redisCommand };
+// Re-export for backward compatibility
+export { redisCommand, buildSearchKey };

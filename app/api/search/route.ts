@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ZodError, z } from "zod";
-import { SearchRequestSchema, type SearchRequest, SearchResultSchema, type SearchResult, hnTagsEnum } from "@/lib/validation";
+import { ZodError } from "zod";
+import {
+  SearchRequestSchema,
+  type SearchRequest,
+  type SearchResult,
+} from "@/lib/validation";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import {
   buildSearchKey,
@@ -9,7 +13,8 @@ import {
   getSearchIdForKey,
   setSearchKeyForId,
 } from "@/lib/cache";
-import { applyRateLimit } from "@/lib/rate-limit";
+import { applyRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
+import { assembleSearchResultFromDB } from "@/lib/db-helpers";
 
 function getClientIp(req: NextRequest): string {
   const header = req.headers.get("x-forwarded-for");
@@ -17,7 +22,7 @@ function getClientIp(req: NextRequest): string {
     const ip = header.split(",")[0]?.trim();
     if (ip) return ip;
   }
-  // Next.js on Vercel exposes req.ip in many environments
+  // Next.js on Vercel exposes req.ip
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyReq = req as any;
   if (typeof anyReq.ip === "string" && anyReq.ip.length > 0) {
@@ -26,10 +31,13 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
-async function enforceRateLimits(req: NextRequest, input: SearchRequest) {
+async function enforceRateLimits(
+  req: NextRequest,
+  input: SearchRequest
+): Promise<{ error: NextResponse | null; headers: Record<string, string> }> {
   const ip = getClientIp(req);
 
-  // Per-IP limit: e.g. 20 searches per 10 minutes
+  // Per-IP limit: 20 searches per 10 minutes
   const ipLimit = await applyRateLimit({
     identifier: ip,
     maxRequests: 20,
@@ -37,25 +45,29 @@ async function enforceRateLimits(req: NextRequest, input: SearchRequest) {
     prefix: "rate:ip",
   });
 
+  const ipHeaders = getRateLimitHeaders(ipLimit);
+
   if (!ipLimit.allowed) {
-    return NextResponse.json(
-      {
-        error: "Too many requests from this IP, please slow down.",
-      },
-      {
-        status: 429,
-        headers: {
-          "X-RateLimit-Limit": String(ipLimit.totalHits),
-          "X-RateLimit-Remaining": String(ipLimit.remaining),
-          "Retry-After": String(
-            Math.max(1, Math.round((ipLimit.resetAt - Date.now()) / 1000))
-          ),
+    return {
+      error: NextResponse.json(
+        {
+          error: "Too many requests from this IP. Please slow down.",
         },
-      }
-    );
+        {
+          status: 429,
+          headers: {
+            ...ipHeaders,
+            "Retry-After": String(
+              Math.max(1, Math.round((ipLimit.resetAt - Date.now()) / 1000))
+            ),
+          },
+        }
+      ),
+      headers: ipHeaders,
+    };
   }
 
-  // Optional per-topic (per-searchKey) soft limit
+  // Per-topic limit: 10 searches per minute
   const searchKey = buildSearchKey(input);
   const topicLimit = await applyRateLimit({
     identifier: searchKey,
@@ -65,51 +77,72 @@ async function enforceRateLimits(req: NextRequest, input: SearchRequest) {
   });
 
   if (!topicLimit.allowed) {
-    return NextResponse.json(
-      {
-        error:
-          "This topic is being searched too frequently. Please wait a bit before trying again.",
-      },
-      {
-        status: 429,
-        headers: {
-          "X-RateLimit-Remaining-Topic": String(topicLimit.remaining),
+    return {
+      error: NextResponse.json(
+        {
+          error:
+            "This topic is being searched too frequently. Please wait a moment.",
         },
-      }
-    );
+        {
+          status: 429,
+          headers: {
+            ...ipHeaders,
+            "X-RateLimit-Remaining-Topic": String(topicLimit.remaining),
+          },
+        }
+      ),
+      headers: ipHeaders,
+    };
   }
 
-  return null;
+  return { error: null, headers: ipHeaders };
 }
 
 /**
  * Trigger the scrape_and_analyze edge function
+ * Returns true if successfully triggered (doesn't wait for completion)
  */
-async function triggerEdgeFunction(searchId: string): Promise<void> {
+async function triggerEdgeFunction(searchId: string): Promise<boolean> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error("Missing Supabase configuration");
+    console.error("[triggerEdgeFunction] Missing Supabase configuration");
+    return false;
   }
 
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/scrape_and_analyze`;
-  
-  // Fire and forget - don't wait for completion
-  fetch(edgeFunctionUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ searchId }),
-  }).catch((err) => {
+
+  try {
+    // Fire and forget - don't wait for completion
+    const response = await fetch(edgeFunctionUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ searchId }),
+      // Don't wait forever for edge function
+      signal: AbortSignal.timeout(2000),
+    });
+
+    if (!response.ok) {
+      console.error(
+        `[triggerEdgeFunction] Edge function returned ${response.status}`
+      );
+      return false;
+    }
+
+    return true;
+  } catch (err) {
     console.error("[triggerEdgeFunction] Failed to invoke edge function", err);
-  });
+    return false;
+  }
 }
 
 /**
  * Short-poll for search results, checking cache and DB
+ * Returns result if ready within maxWaitMs, otherwise null
  */
 async function shortPollForResults(
   searchId: string,
@@ -134,22 +167,22 @@ async function shortPollForResults(
       .single();
 
     if (!search) {
+      console.error(`[shortPollForResults] Search ${searchId} not found in DB`);
       return null;
     }
 
     if (search.status === "completed") {
-      // Try to fetch from cache again (might have been written while we checked)
+      // Try cache again (might have been written while we checked DB)
       const cachedAfter = await getCachedSearchResultById(searchId);
       if (cachedAfter) {
         return cachedAfter;
       }
 
-      // If not in cache, assemble from DB (fallback)
+      // Fallback: assemble from DB
       return await assembleSearchResultFromDB(searchId, supabase);
     }
 
     if (search.status === "failed") {
-      // Return a failed result
       return {
         searchId,
         status: "failed",
@@ -171,162 +204,83 @@ async function shortPollForResults(
   return null;
 }
 
-/**
- * Assemble SearchResult from database tables (fallback when cache misses)
- */
-async function assembleSearchResultFromDB(
-  searchId: string,
-  supabase: ReturnType<typeof getSupabaseServiceClient>
-): Promise<SearchResult | null> {
-  try {
-    // Fetch search row
-    const { data: search } = await supabase
-      .from("searches")
-      .select("*")
-      .eq("id", searchId)
-      .single();
-
-    if (!search) return null;
-
-    // Fetch search_results
-    const { data: searchResults } = await supabase
-      .from("search_results")
-      .select("*")
-      .eq("search_id", searchId)
-      .single();
-
-    // Fetch pain_points
-    const { data: painPoints } = await supabase
-      .from("pain_points")
-      .select("*")
-      .eq("search_id", searchId);
-
-    // Fetch quotes (join through pain_points)
-    const painPointIds = (painPoints || []).map((pp) => pp.id);
-    const { data: quotes } = painPointIds.length > 0
-      ? await supabase
-          .from("pain_point_quotes")
-          .select("*")
-          .in("pain_point_id", painPointIds)
-      : { data: [] };
-
-    // Fetch AI analysis
-    const { data: analysis } = await supabase
-      .from("ai_analyses")
-      .select("*")
-      .eq("search_id", searchId)
-      .single();
-
-    // Assemble result
-    // Validate and filter tags to ensure they match the HN tags enum
-    const validTags = Array.isArray(search.subreddits)
-      ? search.subreddits.filter((tag: unknown): tag is z.infer<typeof hnTagsEnum> =>
-          typeof tag === "string" && hnTagsEnum.safeParse(tag).success
-        )
-      : [];
-
-    const result: SearchResult = {
-      searchId: search.id,
-      status: search.status as "pending" | "processing" | "completed" | "failed",
-      topic: search.topic,
-      tags: validTags,
-      timeRange: search.time_range as "week" | "month" | "year" | "all",
-      minUpvotes: search.min_upvotes,
-      sortBy: search.sort_by as "relevance" | "upvotes" | "recency",
-      totalMentions: searchResults?.total_mentions ?? undefined,
-      totalPostsConsidered: searchResults?.total_posts_considered ?? undefined,
-      totalCommentsConsidered: searchResults?.total_comments_considered ?? undefined,
-      sourceTags: searchResults?.source_tags ?? undefined,
-      painPoints: (painPoints || []).map((pp) => ({
-        id: pp.id,
-        searchId: pp.search_id,
-        title: pp.title,
-        sourceTag: pp.subreddit, // Using subreddit column for HN tag
-        mentionsCount: pp.mentions_count,
-        severityScore: pp.severity_score ? Number(pp.severity_score) : undefined,
-      })),
-      quotes: (quotes || []).map((q) => ({
-        id: q.id,
-        painPointId: q.pain_point_id,
-        quoteText: q.quote_text,
-        authorHandle: q.author_handle,
-        upvotes: q.upvotes,
-        permalink: q.permalink,
-      })),
-      analysis: analysis
-        ? {
-            summary: analysis.summary,
-            problemClusters: Array.isArray(analysis.problem_clusters)
-              ? analysis.problem_clusters
-              : [],
-            productIdeas: Array.isArray(analysis.product_ideas)
-              ? analysis.product_ideas
-              : [],
-            model: analysis.model ?? undefined,
-            tokensUsed: analysis.tokens_used ?? undefined,
-          }
-        : undefined,
-    };
-
-    return SearchResultSchema.parse(result);
-  } catch (error) {
-    console.error("[assembleSearchResultFromDB] Failed to assemble result", error);
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const parsed = SearchRequestSchema.parse(body);
 
-    // Enforce IP + topic-based rate limits
-    const rateLimitResponse = await enforceRateLimits(request, parsed);
-    if (rateLimitResponse) return rateLimitResponse;
+    // Enforce rate limits
+    const { error: rateLimitError, headers: rateLimitHeaders } =
+      await enforceRateLimits(request, parsed);
+
+    if (rateLimitError) {
+      return rateLimitError;
+    }
 
     const searchKey = buildSearchKey(parsed);
 
-    // 1) Check Redis for a fully cached result for this searchKey
+    // 1) Check Redis for fully cached result
     const cached = await getCachedSearchResultByKey(searchKey);
     if (cached) {
-      return NextResponse.json(cached, { status: 200 });
+      console.log(`[POST /api/search] Cache hit for searchKey: ${searchKey}`);
+      return NextResponse.json(cached, {
+        status: 200,
+        headers: rateLimitHeaders,
+      });
     }
 
     const supabase = getSupabaseServiceClient();
 
-    // 2) If a recent searchId exists for this searchKey, reuse it
+    // 2) Check if recent searchId exists for this searchKey
     const existingSearchId = await getSearchIdForKey(searchKey);
     if (existingSearchId) {
-      // Check cache first
+      console.log(
+        `[POST /api/search] Found existing searchId: ${existingSearchId}`
+      );
+
+      // Check cache by ID
       const cachedById = await getCachedSearchResultById(existingSearchId);
       if (cachedById && cachedById.status === "completed") {
-        return NextResponse.json(cachedById, { status: 200 });
+        return NextResponse.json(cachedById, {
+          status: 200,
+          headers: rateLimitHeaders,
+        });
       }
 
+      // Check DB
       const { data: existingSearch } = await supabase
         .from("searches")
-        .select("id, status")
+        .select("id, status, error_message")
         .eq("id", existingSearchId)
         .single();
 
       if (existingSearch) {
         // If still processing, trigger edge function again (idempotent)
-        if (existingSearch.status === "processing" || existingSearch.status === "pending") {
-          await triggerEdgeFunction(existingSearchId).catch((err) => {
-            console.error("Failed to trigger edge function for existing search", err);
-          });
+        if (
+          existingSearch.status === "processing" ||
+          existingSearch.status === "pending"
+        ) {
+          await triggerEdgeFunction(existingSearchId);
         }
+
         return NextResponse.json(
           {
             searchId: existingSearch.id,
             status: existingSearch.status,
+            ...(existingSearch.error_message && {
+              errorMessage: existingSearch.error_message,
+            }),
           },
-          { status: 202 }
+          { status: 202, headers: rateLimitHeaders }
         );
       }
     }
 
-    // 3) Create a new search row and map searchKey -> searchId in Redis
+    // 3) Create new search row
+    console.log(
+      `[POST /api/search] Creating new search for topic: ${parsed.topic}`
+    );
+
     const { data, error } = await supabase
       .from("searches")
       .insert({
@@ -341,29 +295,35 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error || !data) {
-      console.error("Error inserting search:", error);
+      console.error("[POST /api/search] Error inserting search:", error);
       return NextResponse.json(
         { error: "Failed to create search" },
-        { status: 500 }
+        { status: 500, headers: rateLimitHeaders }
       );
     }
 
-    // Best-effort mapping; failures here shouldn't break the request
+    // Map searchKey -> searchId in Redis (best-effort)
     setSearchKeyForId(searchKey, data.id).catch((err) => {
-      console.error("Failed to set searchKey mapping in Redis", err);
+      console.error("[POST /api/search] Failed to set searchKey mapping:", err);
     });
 
-    // 4) Trigger the edge function to start processing
-    await triggerEdgeFunction(data.id).catch((err) => {
-      console.error("Failed to trigger edge function", err);
-      // Don't fail the request if edge function trigger fails
-    });
+    // 4) Trigger edge function
+    const triggered = await triggerEdgeFunction(data.id);
+    if (!triggered) {
+      console.warn(
+        `[POST /api/search] Edge function trigger failed for ${data.id}`
+      );
+      // Don't fail the request - edge function might still pick it up via pg_cron
+    }
 
     // 5) Short-poll for results (up to 8 seconds)
     const pollResult = await shortPollForResults(data.id, 8000);
-    
+
     if (pollResult && pollResult.status === "completed") {
-      return NextResponse.json(pollResult, { status: 200 });
+      return NextResponse.json(pollResult, {
+        status: 200,
+        headers: rateLimitHeaders,
+      });
     }
 
     // Return processing status if not ready yet
@@ -372,20 +332,20 @@ export async function POST(request: NextRequest) {
         searchId: data.id,
         status: pollResult?.status || "processing",
       },
-      { status: 202 }
+      { status: 202, headers: rateLimitHeaders }
     );
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
         {
           error: "Invalid request payload",
-          issues: error.flatten(),
+          issues: error.flatten().fieldErrors,
         },
         { status: 400 }
       );
     }
 
-    console.error("Error in /api/search:", error);
+    console.error("[POST /api/search] Unexpected error:", error);
 
     return NextResponse.json(
       {
