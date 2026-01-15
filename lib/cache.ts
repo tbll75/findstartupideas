@@ -1,15 +1,8 @@
-import { SearchResult, SearchResultSchema, SearchRequest } from "@/lib/validation";
-
-/**
- * Low-level Upstash Redis REST client helper.
- *
- * Uses the standard Upstash REST API:
- *   - URL: process.env.UPSTASH_REDIS_REST_URL
- *   - Token: process.env.UPSTASH_REDIS_REST_TOKEN
- *
- * All helpers in this file are safe to use from Next.js
- * Route Handlers (server-only).
- */
+import {
+  SearchResult,
+  SearchResultSchema,
+  SearchRequest,
+} from "@/lib/validation";
 
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -53,9 +46,7 @@ async function redisCommand<T = unknown>(
     };
   }
 
-  const json = (await res.json().catch(() => null)) as
-    | { result: T }
-    | null;
+  const json = (await res.json().catch(() => null)) as { result: T } | null;
 
   if (!json || typeof json.result === "undefined") {
     return { result: null, error: "Malformed Redis response" };
@@ -137,6 +128,34 @@ export async function getCachedSearchResultById(
 
   try {
     const parsed = JSON.parse(raw);
+
+    // Clean up analysis arrays - filter out items missing required fields
+    if (parsed.analysis) {
+      if (Array.isArray(parsed.analysis.problemClusters)) {
+        parsed.analysis.problemClusters =
+          parsed.analysis.problemClusters.filter(
+            (item: unknown) =>
+              item &&
+              typeof item === "object" &&
+              "title" in item &&
+              typeof item.title === "string" &&
+              "description" in item &&
+              typeof item.description === "string"
+          );
+      }
+      if (Array.isArray(parsed.analysis.productIdeas)) {
+        parsed.analysis.productIdeas = parsed.analysis.productIdeas.filter(
+          (item: unknown) =>
+            item &&
+            typeof item === "object" &&
+            "title" in item &&
+            typeof item.title === "string" &&
+            "description" in item &&
+            typeof item.description === "string"
+        );
+      }
+    }
+
     const validated = SearchResultSchema.parse(parsed);
     return validated;
   } catch (error) {
@@ -155,6 +174,34 @@ export async function getCachedSearchResultByKey(
 
   try {
     const parsed = JSON.parse(raw);
+
+    // Clean up analysis arrays - filter out items missing required fields
+    if (parsed.analysis) {
+      if (Array.isArray(parsed.analysis.problemClusters)) {
+        parsed.analysis.problemClusters =
+          parsed.analysis.problemClusters.filter(
+            (item: unknown) =>
+              item &&
+              typeof item === "object" &&
+              "title" in item &&
+              typeof item.title === "string" &&
+              "description" in item &&
+              typeof item.description === "string"
+          );
+      }
+      if (Array.isArray(parsed.analysis.productIdeas)) {
+        parsed.analysis.productIdeas = parsed.analysis.productIdeas.filter(
+          (item: unknown) =>
+            item &&
+            typeof item === "object" &&
+            "title" in item &&
+            typeof item.title === "string" &&
+            "description" in item &&
+            typeof item.description === "string"
+        );
+      }
+    }
+
     const validated = SearchResultSchema.parse(parsed);
     return validated;
   } catch (error) {
@@ -198,7 +245,16 @@ export async function getSearchIdForKey(
 ): Promise<string | null> {
   const key = searchKeyMappingKey(searchKey);
   const raw = await redisGet(key);
-  return raw ?? null;
+  if (!raw) return null;
+
+  // The edge function stores searchId as JSON.stringify(searchId), so we need to parse it
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "string" ? parsed : raw;
+  } catch {
+    // If parsing fails, return raw (might be stored as plain string)
+    return raw;
+  }
 }
 
 export async function setSearchKeyForId(
@@ -214,4 +270,3 @@ export async function setSearchKeyForId(
 }
 
 export { redisCommand };
-

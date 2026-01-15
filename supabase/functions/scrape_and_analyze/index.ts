@@ -1,13 +1,3 @@
-// Supabase Edge Function: scrape_and_analyze
-//
-// Responsibilities (Architecture Plan - Step 4):
-// - Accept a search_id
-// - Load search parameters from DB
-// - Fetch Hacker News stories + comments according to filters
-// - Build compact payload and call Gemini for analysis
-// - Upsert search_results, pain_points, pain_point_quotes, ai_analyses
-// - Assemble SearchResult-shaped payload and write to Redis cache
-
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -16,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 type SearchRow = {
   id: string;
   topic: string;
-  subreddits: string[] | null; // used as HN tags
+  subreddits: string[] | null;
   time_range: "week" | "month" | "year" | "all" | string;
   min_upvotes: number;
   sort_by: "relevance" | "upvotes" | "recency" | string;
@@ -37,7 +27,7 @@ type PainPointRow = {
   id: string;
   search_id: string;
   title: string;
-  subreddit: string; // used as HN tag
+  subreddit: string;
   mentions_count: number;
   severity_score: number | null;
 };
@@ -61,7 +51,6 @@ type AiAnalysisRow = {
   tokens_used: number | null;
 };
 
-// Shape roughly aligned with `SearchResult` from `lib/validation.ts`
 type SearchResultPayload = {
   searchId: string;
   status: "pending" | "processing" | "completed" | "failed";
@@ -101,14 +90,16 @@ type SearchResultPayload = {
 
 // --- Environment & helpers ----------------------------------------
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ??
+const SUPABASE_URL =
+  Deno.env.get("SUPABASE_URL") ??
   Deno.env.get("NEXT_PUBLIC_SUPABASE_URL") ??
   "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY =
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.warn(
-    "[scrape_and_analyze] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars.",
+    "[scrape_and_analyze] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars."
   );
 }
 
@@ -116,9 +107,35 @@ const REDIS_URL = Deno.env.get("UPSTASH_REDIS_REST_URL") ?? "";
 const REDIS_TOKEN = Deno.env.get("UPSTASH_REDIS_REST_TOKEN") ?? "";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-1.5-flash";
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash-lite";
 
-// Re-implementation of `buildSearchKey` to avoid importing Node code.
+// --- Utility: Retry with exponential backoff ----------------------
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  delayMs = 1000,
+  context = "operation"
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+
+      const backoff = delayMs * Math.pow(2, attempt - 1);
+      console.warn(
+        `[${context}] Attempt ${attempt}/${maxRetries} failed, retrying in ${backoff}ms...`,
+        error
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    }
+  }
+  throw new Error("Retry failed");
+}
+
+// --- Redis helpers (FIXED) ----------------------------------------
+
 function buildSearchKey(input: {
   topic: string;
   tags: string[];
@@ -155,36 +172,52 @@ function redisKeySearchMap(searchKey: string): string {
 async function redisSet(
   key: string,
   value: unknown,
-  ttlSeconds = 60 * 30,
+  ttlSeconds = 60 * 30
 ): Promise<void> {
-  if (!REDIS_URL || !REDIS_TOKEN) return;
-  const body = JSON.stringify({
-    key,
-    value: JSON.stringify(value),
-    ttlSeconds,
-  });
+  if (!REDIS_URL || !REDIS_TOKEN) {
+    console.warn("[redisSet] Redis not configured, skipping cache");
+    return;
+  }
 
-  // Using Upstash REST "SET" equivalent via simple GET-style API
-  // Here we call the standard /set/{key}/{value}/EX/{ttl} style route.
-  const url =
-    `${REDIS_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(JSON.stringify(value))}/EX/${ttlSeconds}`;
+  const serializedValue = JSON.stringify(value);
 
-  await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${REDIS_TOKEN}`,
-    },
-  }).catch((err) =>
-    console.error("[scrape_and_analyze] Failed to write Redis", err)
-  );
+  try {
+    // Use Upstash pipeline endpoint for atomic SET + EXPIRE
+    const res = await fetch(`${REDIS_URL}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REDIS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["SET", key, serializedValue],
+        ["EXPIRE", key, ttlSeconds],
+      ]),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(`[redisSet] Redis failed: ${res.status} ${text}`);
+      return;
+    }
+
+    const results = await res.json().catch(() => null);
+    if (!results || !Array.isArray(results) || results.length !== 2) {
+      console.error(`[redisSet] Unexpected Redis response:`, results);
+    }
+  } catch (err) {
+    console.error("[redisSet] Failed to write to Redis", err);
+  }
 }
+
+// --- Supabase helpers ---------------------------------------------
 
 async function logJob(
   supabase: ReturnType<typeof createClient>,
   searchId: string | null,
   level: "info" | "error",
   message: string,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ) {
   try {
     await supabase.from("job_logs").insert({
@@ -194,7 +227,7 @@ async function logJob(
       context: context ?? null,
     });
   } catch (err) {
-    console.error("[scrape_and_analyze] Failed to log job", err);
+    console.error("[logJob] Failed to log", err);
   }
 }
 
@@ -202,16 +235,44 @@ async function updateSearchStatus(
   supabase: ReturnType<typeof createClient>,
   searchId: string,
   status: "pending" | "processing" | "completed" | "failed",
-  errorMessage?: string,
+  errorMessage?: string
 ) {
   const update: Record<string, unknown> = { status };
-  if (errorMessage) update.error_message = errorMessage;
+  if (status === "completed") {
+    update.completed_at = new Date().toISOString();
+  }
+  if (errorMessage) {
+    update.error_message = errorMessage;
+  }
 
-  const { error } = await supabase.from("searches").update(update)
+  const { error } = await supabase
+    .from("searches")
+    .update(update)
     .eq("id", searchId);
 
   if (error) {
-    console.error("[scrape_and_analyze] Failed to update search status", error);
+    console.error("[updateSearchStatus] Failed to update", error);
+  }
+}
+
+async function trackApiUsage(
+  supabase: ReturnType<typeof createClient>,
+  searchId: string,
+  service: string,
+  tokensUsed: number,
+  costPerMillion: number
+) {
+  try {
+    const estimatedCost = (tokensUsed / 1_000_000) * costPerMillion;
+
+    await supabase.from("api_usage").insert({
+      search_id: searchId,
+      service,
+      tokens_used: tokensUsed,
+      estimated_cost_usd: estimatedCost,
+    });
+  } catch (err) {
+    console.error("[trackApiUsage] Failed to track usage", err);
   }
 }
 
@@ -249,7 +310,7 @@ type HNComment = {
 };
 
 function mapTimeRangeToTimestamp(
-  timeRange: HNSearchParams["timeRange"],
+  timeRange: HNSearchParams["timeRange"]
 ): number | null {
   const now = Math.floor(Date.now() / 1000);
   if (timeRange === "week") return now - 60 * 60 * 24 * 7;
@@ -282,7 +343,7 @@ function mapTags(tags: string[]): string | undefined {
 
 async function fetchHNSearch(
   params: HNSearchParams,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<HNStory[]> {
   const endpoint = mapSortEndpoint(params.sortBy);
   const hitsPerPage = 30;
@@ -300,7 +361,11 @@ async function fetchHNSearch(
     if (numericFilters) url.searchParams.set("numericFilters", numericFilters);
 
     const res = await fetch(url.toString(), { signal });
-    if (!res.ok) break;
+    if (!res.ok) {
+      console.warn(`[fetchHNSearch] Page ${page} failed: ${res.status}`);
+      break;
+    }
+
     const json = await res.json();
     const hits = json?.hits ?? [];
     if (!Array.isArray(hits) || hits.length === 0) break;
@@ -312,21 +377,25 @@ async function fetchHNSearch(
         id: String(id),
         title: hit.title ?? hit.story_title ?? "",
         url: hit.url ?? hit.story_url ?? null,
-        text: typeof hit.story_text === "string"
-          ? hit.story_text
-          : typeof hit.text === "string"
-          ? hit.text
-          : null,
+        text:
+          typeof hit.story_text === "string"
+            ? hit.story_text
+            : typeof hit.text === "string"
+            ? hit.text
+            : null,
         points: typeof hit.points === "number" ? hit.points : 0,
         author: typeof hit.author === "string" ? hit.author : null,
-        createdAt: typeof hit.created_at_i === "number"
-          ? hit.created_at_i * 1000
-          : Date.now(),
+        createdAt:
+          typeof hit.created_at_i === "number"
+            ? hit.created_at_i * 1000
+            : Date.now(),
         tags: Array.isArray(hit._tags) ? hit._tags : [],
-        numComments: typeof hit.num_comments === "number" ? hit.num_comments : 0,
+        numComments:
+          typeof hit.num_comments === "number" ? hit.num_comments : 0,
       });
     }
 
+    // Rate limiting: 200ms between pages
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
@@ -335,11 +404,11 @@ async function fetchHNSearch(
 
 async function fetchHNComments(
   storyId: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<HNComment[]> {
   const res = await fetch(
     `https://hn.algolia.com/api/v1/items/${encodeURIComponent(storyId)}`,
-    { signal },
+    { signal }
   );
   if (!res.ok) return [];
 
@@ -355,16 +424,16 @@ async function fetchHNComments(
       text: child.text,
       points: typeof child.points === "number" ? child.points : 0,
       author: typeof child.author === "string" ? child.author : null,
-      createdAt: typeof child.created_at_i === "number"
-        ? child.created_at_i * 1000
-        : Date.now(),
+      createdAt:
+        typeof child.created_at_i === "number"
+          ? child.created_at_i * 1000
+          : Date.now(),
       storyId,
       parentId: child.parent_id ? String(child.parent_id) : null,
       permalink: `https://news.ycombinator.com/item?id=${storyId}#${child.id}`,
     });
   }
 
-  // Sort comments by points descending and take top slice
   comments.sort((a, b) => b.points - a.points);
   return comments.slice(0, 20);
 }
@@ -379,15 +448,30 @@ function pickPrimaryTag(story: HNStory): string {
 
 function stripHtml(input: string | null | undefined): string {
   if (!input) return "";
-  return input.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  return input
+    .replace(/<[^>]+>/g, "")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-// --- Gemini API helper --------------------------------------------
+// --- Gemini API helper (FIXED) ------------------------------------
 
 type GeminiAnalysis = {
   summary: string;
-  problemClusters: unknown[];
-  productIdeas: unknown[];
+  problemClusters: Array<{
+    title: string;
+    description: string;
+    severity: number;
+    mentionCount: number;
+    examples: string[];
+  }>;
+  productIdeas: Array<{
+    title: string;
+    description: string;
+    targetProblem: string;
+    impactScore: number;
+  }>;
   model?: string;
   tokensUsed?: number;
 };
@@ -398,15 +482,15 @@ async function callGeminiForAnalysis(input: {
   comments: Map<string, HNComment[]>;
 }): Promise<GeminiAnalysis | null> {
   if (!GEMINI_API_KEY) {
-    console.warn("[scrape_and_analyze] GEMINI_API_KEY not configured");
+    console.warn("[callGeminiForAnalysis] GEMINI_API_KEY not configured");
     return null;
   }
 
   const trimmedItems = input.stories.slice(0, 40).map((story) => {
     const cs = input.comments.get(story.id) ?? [];
-    const commentSnippets = cs.slice(0, 10).map((c) =>
-      stripHtml(c.text ?? "").slice(0, 280)
-    );
+    const commentSnippets = cs
+      .slice(0, 10)
+      .map((c) => stripHtml(c.text ?? "").slice(0, 280));
     return {
       tag: pickPrimaryTag(story),
       title: story.title,
@@ -417,32 +501,56 @@ async function callGeminiForAnalysis(input: {
     };
   });
 
-  const systemPrompt =
-    "You are analyzing Hacker News discussions about a product/topic. Summarize key pain themes and propose product ideas. Respond in strict JSON.";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    GEMINI_MODEL
+  )}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
 
-  const userPrompt =
-    `Topic: ${input.topic}\n\nPlease identify top pain themes and product ideas based on these Hacker News stories and comments.`;
+  const prompt = `Analyze these Hacker News discussions about "${input.topic}".
 
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+Identify the top 3-7 pain point themes and generate product ideas.
+
+Return ONLY valid JSON (no markdown, no backticks) in this EXACT format:
+
+{
+  "summary": "2-3 sentence overview of main themes",
+  "problemClusters": [
+    {
+      "title": "Pain point title",
+      "description": "1-2 sentence description",
+      "severity": 7,
+      "mentionCount": 12,
+      "examples": ["Quote from user 1", "Quote from user 2"]
+    }
+  ],
+  "productIdeas": [
+    {
+      "title": "Product idea name",
+      "description": "What it does and why it solves the pain",
+      "targetProblem": "Which pain point title it addresses",
+      "impactScore": 8
+    }
+  ]
+}
+
+Important:
+- Identify distinct pain themes, not just categories
+- Include real quotes in the examples array (2-5 per cluster)
+- Severity is 1-10 (10 = most severe)
+- Impact score is 1-10 (10 = highest impact)
+
+Data to analyze:
+${JSON.stringify(trimmedItems, null, 2)}`;
 
   const body = {
     contents: [
       {
         role: "user",
-        parts: [
-          { text: systemPrompt },
-          {
-            text:
-              "Return JSON with shape: {\"summary\": string, \"problemClusters\": Array<any>, \"productIdeas\": Array<any>}. Do not include markdown.",
-          },
-          { text: userPrompt },
-          { text: JSON.stringify(trimmedItems) },
-        ],
+        parts: [{ text: prompt }],
       },
     ],
     generationConfig: {
       temperature: 0.3,
+      responseMimeType: "application/json",
     },
   };
 
@@ -456,20 +564,29 @@ async function callGeminiForAnalysis(input: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("[scrape_and_analyze] Gemini error", res.status, text);
+    console.error("[callGeminiForAnalysis] Gemini error", res.status, text);
     return null;
   }
 
   const json = await res.json();
   const candidates = json?.candidates ?? [];
   const text = candidates[0]?.content?.parts?.[0]?.text ?? "";
-  if (!text) return null;
+
+  if (!text) {
+    console.error("[callGeminiForAnalysis] No text in Gemini response");
+    return null;
+  }
 
   let parsed: any;
   try {
-    parsed = JSON.parse(text);
+    const cleaned = text
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+    parsed = JSON.parse(cleaned);
   } catch (err) {
-    console.error("[scrape_and_analyze] Failed to parse Gemini JSON", err);
+    console.error("[callGeminiForAnalysis] Failed to parse Gemini JSON", err);
+    console.error("[callGeminiForAnalysis] Raw response:", text);
     return null;
   }
 
@@ -478,11 +595,9 @@ async function callGeminiForAnalysis(input: {
     problemClusters: Array.isArray(parsed.problemClusters)
       ? parsed.problemClusters
       : [],
-    productIdeas: Array.isArray(parsed.productIdeas)
-      ? parsed.productIdeas
-      : [],
+    productIdeas: Array.isArray(parsed.productIdeas) ? parsed.productIdeas : [],
     model: GEMINI_MODEL,
-    tokensUsed: undefined,
+    tokensUsed: json?.usageMetadata?.totalTokenCount,
   };
 }
 
@@ -494,8 +609,6 @@ serve(async (req) => {
   });
 
   const url = new URL(req.url);
-
-  // Accept searchId from JSON body or query param
   let searchId: string | null = url.searchParams.get("searchId");
 
   try {
@@ -510,24 +623,21 @@ serve(async (req) => {
   }
 
   if (!searchId) {
-    return new Response(
-      JSON.stringify({ error: "Missing searchId" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Missing searchId" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
-  const timeoutMs = 35_000;
+  const timeoutMs = 60_000; // 60 seconds
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 
   try {
-    await logJob(
-      supabase,
-      searchId,
-      "info",
-      "scrape_and_analyze job started",
-    );
+    console.log(`[${searchId}] Job started`);
+    await logJob(supabase, searchId, "info", "scrape_and_analyze job started");
 
+    // Load search parameters
     const { data: search, error: searchError } = await supabase
       .from("searches")
       .select("*")
@@ -535,20 +645,16 @@ serve(async (req) => {
       .single<SearchRow>();
 
     if (searchError || !search) {
-      await logJob(
-        supabase,
-        searchId,
-        "error",
-        "Search not found",
-        { error: searchError },
-      );
-      return new Response(
-        JSON.stringify({ error: "Search not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
-      );
+      await logJob(supabase, searchId, "error", "Search not found", {
+        error: searchError,
+      });
+      return new Response(JSON.stringify({ error: "Search not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // Short-circuit if we already have results
+    // Short-circuit if results already exist
     const { data: existingResults } = await supabase
       .from("search_results")
       .select("*")
@@ -556,16 +662,17 @@ serve(async (req) => {
       .maybeSingle<SearchResultsRow>();
 
     if (existingResults) {
+      console.log(`[${searchId}] Results already exist, skipping`);
       await logJob(
         supabase,
         searchId,
         "info",
-        "Existing search_results found; skipping re-scrape",
+        "Existing results found, skipping re-scrape"
       );
-      return new Response(
-        JSON.stringify({ status: "already_completed" }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ status: "already_completed" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     await updateSearchStatus(supabase, searchId, "processing");
@@ -580,12 +687,32 @@ serve(async (req) => {
       minUpvotes: search.min_upvotes ?? 0,
     };
 
-    const stories = await fetchHNSearch(hnParams, abortController.signal);
+    // STEP 1: Fetch HN stories with retry
+    console.log(`[${searchId}] Fetching HN stories...`);
+    const stories = await withRetry(
+      () => fetchHNSearch(hnParams, abortController.signal),
+      3,
+      1000,
+      `${searchId}-fetch-stories`
+    );
+
+    console.log(`[${searchId}] Found ${stories.length} stories`);
     const limitedStories = stories.slice(0, 60);
 
+    // STEP 2: Fetch comments for top stories
     const comments = new Map<string, HNComment[]>();
-    for (const story of limitedStories.slice(0, 25)) {
-      const cs = await fetchHNComments(story.id, abortController.signal);
+    const storiesToFetchComments = limitedStories.slice(0, 25);
+    console.log(
+      `[${searchId}] Fetching comments for ${storiesToFetchComments.length} stories`
+    );
+
+    for (const story of storiesToFetchComments) {
+      const cs = await withRetry(
+        () => fetchHNComments(story.id, abortController.signal),
+        2,
+        500,
+        `${searchId}-fetch-comments-${story.id}`
+      );
       comments.set(story.id, cs);
       await new Promise((resolve) => setTimeout(resolve, 120));
     }
@@ -600,6 +727,42 @@ serve(async (req) => {
       totalComments += cs.length;
     }
 
+    console.log(`[${searchId}] Total comments: ${totalComments}`);
+
+    // STEP 3: Call Gemini for analysis
+    console.log(`[${searchId}] Calling Gemini...`);
+    const analysis = await withRetry(
+      () =>
+        callGeminiForAnalysis({
+          topic: search.topic,
+          stories: limitedStories,
+          comments,
+        }),
+      3,
+      2000,
+      `${searchId}-gemini`
+    );
+
+    if (!analysis) {
+      throw new Error("Gemini analysis failed after retries");
+    }
+
+    console.log(
+      `[${searchId}] Gemini returned ${analysis.problemClusters?.length} pain points`
+    );
+
+    // Track Gemini usage
+    if (analysis.tokensUsed) {
+      await trackApiUsage(
+        supabase,
+        searchId,
+        "gemini",
+        analysis.tokensUsed,
+        0.075 // $0.075 per 1M tokens for Gemini 2.0 Flash
+      );
+    }
+
+    // STEP 4: Store search_results metadata
     const totalMentions = totalComments;
 
     const { data: searchResultsRow, error: srError } = await supabase
@@ -619,24 +782,41 @@ serve(async (req) => {
       throw new Error("Failed to insert search_results");
     }
 
-    // Simple heuristic: one pain point per primary tag aggregating mentions.
-    const mentionsByTag = new Map<string, number>();
-    for (const p of limitedStories) {
-      const tag = pickPrimaryTag(p);
-      mentionsByTag.set(tag, (mentionsByTag.get(tag) ?? 0) + 1);
+    // STEP 5: Store pain points from Gemini analysis
+    const painPoints: PainPointRow[] = [];
+
+    if (analysis && Array.isArray(analysis.problemClusters)) {
+      for (const cluster of analysis.problemClusters.slice(0, 10)) {
+        painPoints.push({
+          id: crypto.randomUUID(),
+          search_id: searchId,
+          title: cluster.title || "Untitled pain point",
+          subreddit: "hackernews",
+          mentions_count: cluster.mentionCount || 1,
+          severity_score: cluster.severity || null,
+        });
+      }
     }
 
-    const painPoints: PainPointRow[] = [];
-    for (const [tag, count] of mentionsByTag.entries()) {
-      const id = crypto.randomUUID();
-      painPoints.push({
-        id,
-        search_id: searchId,
-        title: `Recurring discussions in ${tag}`,
-        subreddit: tag,
-        mentions_count: count,
-        severity_score: null,
-      });
+    // Fallback: if no Gemini pain points, create tag-based ones
+    if (painPoints.length === 0) {
+      console.log(`[${searchId}] No Gemini pain points, using fallback`);
+      const mentionsByTag = new Map<string, number>();
+      for (const p of limitedStories) {
+        const tag = pickPrimaryTag(p);
+        mentionsByTag.set(tag, (mentionsByTag.get(tag) ?? 0) + 1);
+      }
+
+      for (const [tag, count] of mentionsByTag.entries()) {
+        painPoints.push({
+          id: crypto.randomUUID(),
+          search_id: searchId,
+          title: `Discussions in ${tag}`,
+          subreddit: tag,
+          mentions_count: count,
+          severity_score: null,
+        });
+      }
     }
 
     if (painPoints.length > 0) {
@@ -648,35 +828,95 @@ serve(async (req) => {
       }
     }
 
-    // Map tag -> pain_point_id for quotes
-    const { data: persistedPainPoints } = await supabase
+    // Reload persisted pain points
+    const { data: persistedPainPoints } = (await supabase
       .from("pain_points")
       .select("*")
-      .eq("search_id", searchId) as unknown as {
-        data: PainPointRow[] | null;
-      };
+      .eq("search_id", searchId)) as unknown as {
+      data: PainPointRow[] | null;
+    };
 
-    const painPointByTag = new Map<string, string>();
-    (persistedPainPoints ?? []).forEach((pp) => {
-      painPointByTag.set(pp.subreddit, pp.id);
-    });
-
+    // STEP 6: Store quotes from Gemini examples
     const quotes: PainPointQuoteRow[] = [];
-    for (const story of limitedStories) {
-      const painPointId = painPointByTag.get(pickPrimaryTag(story));
-      if (!painPointId) continue;
 
-      const cs = comments.get(story.id) ?? [];
-      for (const c of cs.slice(0, 5)) {
+    if (analysis && Array.isArray(analysis.problemClusters)) {
+      for (let i = 0; i < analysis.problemClusters.length; i++) {
+        const cluster = analysis.problemClusters[i];
+        const painPoint = persistedPainPoints?.[i];
+
+        if (!painPoint) continue;
+
+        // Extract quotes from cluster examples
+        if (Array.isArray(cluster.examples)) {
+          for (const example of cluster.examples.slice(0, 5)) {
+            // Try to find the actual comment that matches this quote
+            let foundComment: HNComment | null = null;
+            let foundStory: HNStory | null = null;
+
+            for (const story of limitedStories) {
+              const cs = comments.get(story.id) ?? [];
+              for (const c of cs) {
+                const commentText = stripHtml(c.text ?? "");
+                const exampleSnippet =
+                  typeof example === "string" ? example.substring(0, 50) : "";
+
+                if (commentText.includes(exampleSnippet)) {
+                  foundComment = c;
+                  foundStory = story;
+                  break;
+                }
+              }
+              if (foundComment) break;
+            }
+
+            quotes.push({
+              id: crypto.randomUUID(),
+              pain_point_id: painPoint.id,
+              quote_text:
+                typeof example === "string"
+                  ? example.slice(0, 800)
+                  : stripHtml(foundComment?.text ?? "").slice(0, 800),
+              author_handle: foundComment?.author ?? null,
+              upvotes: foundComment?.points ?? 0,
+              permalink:
+                foundComment?.permalink ??
+                `https://news.ycombinator.com/item?id=${foundStory?.id}`,
+            });
+          }
+        }
+      }
+    }
+
+    // Fallback: if no quotes from Gemini, use top comments
+    if (quotes.length === 0) {
+      console.log(`[${searchId}] No Gemini quotes, using top comments`);
+      const allComments: Array<{ comment: HNComment; story: HNStory }> = [];
+
+      for (const story of limitedStories) {
+        const cs = comments.get(story.id) ?? [];
+        for (const c of cs) {
+          allComments.push({ comment: c, story });
+        }
+      }
+
+      // Sort by upvotes and take top 20
+      allComments.sort((a, b) => b.comment.points - a.comment.points);
+
+      // Distribute across pain points
+      const painPointsArray = persistedPainPoints ?? [];
+      allComments.slice(0, 20).forEach((item, idx) => {
+        const painPoint = painPointsArray[idx % painPointsArray.length];
+        if (!painPoint) return;
+
         quotes.push({
           id: crypto.randomUUID(),
-          pain_point_id: painPointId,
-          quote_text: stripHtml(c.text ?? "").slice(0, 800),
-          author_handle: c.author,
-          upvotes: c.points,
-          permalink: c.permalink,
+          pain_point_id: painPoint.id,
+          quote_text: stripHtml(item.comment.text ?? "").slice(0, 800),
+          author_handle: item.comment.author,
+          upvotes: item.comment.points,
+          permalink: item.comment.permalink,
         });
-      }
+      });
     }
 
     if (quotes.length > 0) {
@@ -685,18 +925,16 @@ serve(async (req) => {
         .insert(quotes);
       if (qError) {
         throw new Error(
-          `Failed to insert pain_point_quotes: ${qError.message}`,
+          `Failed to insert pain_point_quotes: ${qError.message}`
         );
       }
     }
 
-    const analysis = await callGeminiForAnalysis({
-      topic: search.topic,
-      stories: limitedStories,
-      comments,
-    });
+    console.log(`[${searchId}] Stored ${quotes.length} quotes`);
 
+    // STEP 7: Store AI analysis
     let analysisRow: AiAnalysisRow | null = null;
+
     if (analysis && analysis.summary) {
       const { data: aiRows, error: aiError } = await supabase
         .from("ai_analyses")
@@ -711,13 +949,13 @@ serve(async (req) => {
         .select("*");
 
       if (aiError) {
-        console.error("[scrape_and_analyze] Failed to insert ai_analyses", aiError);
+        console.error("[ai_analyses] Insert failed", aiError);
       } else if (Array.isArray(aiRows) && aiRows[0]) {
         analysisRow = aiRows[0] as AiAnalysisRow;
       }
     }
 
-    // Assemble SearchResult-like payload for Redis cache
+    // STEP 8: Assemble payload and cache in Redis
     const payload: SearchResultPayload = {
       searchId,
       status: "completed",
@@ -727,12 +965,14 @@ serve(async (req) => {
       minUpvotes: search.min_upvotes ?? 0,
       sortBy: (search.sort_by as any) ?? "relevance",
       totalMentions: searchResultsRow.total_mentions ?? undefined,
-      totalPostsConsidered: searchResultsRow.total_posts_considered ??
+      totalPostsConsidered:
+        searchResultsRow.total_posts_considered ?? undefined,
+      totalCommentsConsidered:
+        searchResultsRow.total_comments_considered ?? undefined,
+      sourceTags:
+        searchResultsRow.source_tags ??
+        searchResultsRow.source_subreddits ??
         undefined,
-      totalCommentsConsidered: searchResultsRow.total_comments_considered ??
-        undefined,
-      sourceTags: searchResultsRow.source_tags ??
-        searchResultsRow.source_subreddits ?? undefined,
       painPoints: (persistedPainPoints ?? []).map((pp) => ({
         id: pp.id,
         searchId: pp.search_id,
@@ -751,25 +991,23 @@ serve(async (req) => {
       })),
       analysis: analysisRow
         ? {
-          summary: analysisRow.summary,
-          problemClusters: Array.isArray(analysisRow.problem_clusters)
-            ? analysisRow.problem_clusters as unknown[]
-            : [],
-          productIdeas: Array.isArray(analysisRow.product_ideas)
-            ? analysisRow.product_ideas as unknown[]
-            : [],
-          model: analysisRow.model ?? undefined,
-          tokensUsed: analysisRow.tokens_used ?? undefined,
-        }
-        : analysis
-        ? {
-          summary: analysis.summary,
-          problemClusters: analysis.problemClusters,
-          productIdeas: analysis.productIdeas,
-          model: analysis.model,
-          tokensUsed: analysis.tokensUsed,
-        }
-        : undefined,
+            summary: analysisRow.summary,
+            problemClusters: Array.isArray(analysisRow.problem_clusters)
+              ? (analysisRow.problem_clusters as unknown[])
+              : [],
+            productIdeas: Array.isArray(analysisRow.product_ideas)
+              ? (analysisRow.product_ideas as unknown[])
+              : [],
+            model: analysisRow.model ?? undefined,
+            tokensUsed: analysisRow.tokens_used ?? undefined,
+          }
+        : {
+            summary: analysis.summary,
+            problemClusters: analysis.problemClusters,
+            productIdeas: analysis.productIdeas,
+            model: analysis.model,
+            tokensUsed: analysis.tokensUsed,
+          },
     };
 
     const searchKey = buildSearchKey({
@@ -780,6 +1018,7 @@ serve(async (req) => {
       sortBy: (search.sort_by as any) ?? "relevance",
     });
 
+    console.log(`[${searchId}] Caching results in Redis...`);
     await Promise.all([
       redisSet(redisKeyResultById(searchId), payload),
       redisSet(redisKeyResultByKey(searchKey), payload),
@@ -796,37 +1035,57 @@ serve(async (req) => {
         totalPosts,
         totalComments,
         totalMentions,
-      },
+        painPoints: painPoints.length,
+        quotes: quotes.length,
+      }
     );
 
+    console.log(`[${searchId}] Job completed successfully`);
     clearTimeout(timeout);
-    return new Response(
-      JSON.stringify({ status: "completed", searchId }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
-    );
+
+    return new Response(JSON.stringify({ status: "completed", searchId }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("[scrape_and_analyze] Job failed", error);
+    console.error(`[${searchId}] Job failed:`, error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+
+    const userFriendlyMessage = errorMessage.includes("ECONNREFUSED")
+      ? "Unable to reach external services. Please try again."
+      : errorMessage.includes("timeout") || errorMessage.includes("abort")
+      ? "Analysis took too long. Try narrowing your search."
+      : errorMessage.includes("Gemini")
+      ? "AI analysis failed. Please try again."
+      : "Something went wrong. Please try again later.";
+
     await updateSearchStatus(
       supabase,
       searchId!,
       "failed",
-      "Failed to complete analysis. Please try again later.",
+      userFriendlyMessage
     );
     await logJob(
       supabase,
       searchId!,
       "error",
       "scrape_and_analyze job failed",
-      { error: String(error) },
+      {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      }
     );
+
     clearTimeout(timeout);
+
     return new Response(
       JSON.stringify({
         status: "failed",
-        error: "Internal error while processing search.",
+        error: userFriendlyMessage,
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 });
-
