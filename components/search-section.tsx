@@ -417,6 +417,16 @@ export function SearchSection() {
     { value: "poll", label: "Polls" },
   ];
 
+  const getHNTagLabel = (tag: string): string => {
+    if (tag === "hackernews") return "Hacker News";
+
+    const match = hnTags.find((t) => t.value === tag);
+    if (match) return match.label;
+
+    // Fallback: prettify unknown tags like "some_tag" -> "Some Tag"
+    return tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   return (
     <section className="relative py-8 lg:py-10">
       <div className="fixed top-0 left-0 right-0 z-[100] h-1 pointer-events-none">
@@ -549,7 +559,7 @@ export function SearchSection() {
         <div className="mt-8">
           <Accordion className="w-full">
             <AccordionItem value="options" className="border-0">
-              <AccordionTrigger className="group flex items-center gap-2 py-3 px-5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm">
+              <AccordionTrigger className="group flex items-center gap-2 py-3 px-5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm cursor-pointer">
                 <Filter className="w-4 h-4" />
                 <span>Advanced Options</span>
               </AccordionTrigger>
@@ -585,7 +595,7 @@ export function SearchSection() {
                               );
                             }}
                             className={cn(
-                              "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200 relative overflow-hidden",
+                              "cursor-pointer px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200 relative overflow-hidden",
                               isActive
                                 ? "bg-foreground text-background shadow-md"
                                 : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
@@ -620,7 +630,7 @@ export function SearchSection() {
                           key={option.value}
                           onClick={() => setTimeRange(option.value)}
                           className={cn(
-                            "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
+                            "cursor-pointer px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
                             timeRange === option.value
                               ? "bg-foreground text-background shadow-md"
                               : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
@@ -649,7 +659,7 @@ export function SearchSection() {
                           key={value}
                           onClick={() => setMinUpvotes(value)}
                           className={cn(
-                            "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
+                            "cursor-pointer px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
                             minUpvotes === value
                               ? "bg-foreground text-background shadow-md"
                               : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
@@ -682,7 +692,7 @@ export function SearchSection() {
                           key={option.value}
                           onClick={() => setSortBy(option.value)}
                           className={cn(
-                            "px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
+                            "cursor-pointer px-3.5 py-2 text-xs font-medium rounded-lg transition-all duration-200",
                             sortBy === option.value
                               ? "bg-foreground text-background shadow-md"
                               : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80 border border-border/50 hover:border-border"
@@ -792,33 +802,15 @@ export function SearchSection() {
                         </h3>
                         <div className="flex items-center gap-3">
                           {/* HN Tag Badge */}
-                          <span
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200"
-                            style={{
-                              background:
-                                "linear-gradient(135deg, rgba(255, 69, 0, 0.1), rgba(255, 69, 0, 0.05))",
-                              border: "1px solid rgba(255, 69, 0, 0.2)",
-                              color: "#ff4500",
-                            }}
-                          >
+                          <span className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#ff6600]/10 text-[#ff6600] font-medium border border-[#ff6600]/20">
                             <svg
-                              className="w-3.5 h-3.5"
-                              viewBox="0 0 20 20"
+                              className="w-4 h-4"
+                              viewBox="0 0 24 24"
                               fill="currentColor"
                             >
-                              <circle
-                                cx="10"
-                                cy="10"
-                                r="10"
-                                fill="currentColor"
-                                fillOpacity="0.15"
-                              />
-                              <path
-                                d="M16.67 10a1.46 1.46 0 0 0-2.47-1 7.12 7.12 0 0 0-3.85-1.23l.65-3.08 2.14.45a1 1 0 1 0 .13-.61l-2.39-.53a.27.27 0 0 0-.31.2l-.72 3.47a7.14 7.14 0 0 0-3.9 1.23 1.46 1.46 0 1 0-1.61 2.39 2.87 2.87 0 0 0 0 .44c0 2.24 2.61 4.06 5.83 4.06s5.83-1.82 5.83-4.06a2.87 2.87 0 0 0 0-.44 1.46 1.46 0 0 0 .67-1.29zM6.67 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zm5.61 2.71a3.94 3.94 0 0 1-2.28.61 3.94 3.94 0 0 1-2.28-.61.27.27 0 1 1 .31-.45 3.41 3.41 0 0 0 2 .51 3.41 3.41 0 0 0 2-.51.27.27 0 0 1 .31.45zm-.28-1.71a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"
-                                fill="currentColor"
-                              />
+                              <path d="M0 24V0h24v24H0zM11.97 12.53L7.22 3.64H5.25l5.76 10.75v6.97h2.09v-6.97L18.86 3.64h-1.97l-4.92 8.89z" />
                             </svg>
-                            {result.tag}
+                            {getHNTagLabel(result.tag)}
                           </span>
 
                           {/* Mentions count */}
@@ -828,11 +820,6 @@ export function SearchSection() {
                             {result.mentions === 1 ? "mention" : "mentions"}
                           </span>
                         </div>
-                      </div>
-
-                      {/* Expand button placeholder */}
-                      <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
-                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </div>
 
@@ -876,10 +863,6 @@ export function SearchSection() {
                                     {quote.author}
                                   </a>
                                 )}
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <ArrowUp className="w-3 h-3" />
-                                  {quote.upvotes.toLocaleString()}
-                                </span>
                                 {quote.permalink && (
                                   <a
                                     href={quote.permalink}

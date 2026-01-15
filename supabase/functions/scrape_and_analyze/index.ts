@@ -785,13 +785,36 @@ serve(async (req) => {
     // STEP 5: Store pain points from Gemini analysis
     const painPoints: PainPointRow[] = [];
 
+    // Calculate tag distribution from stories to assign proper tags to pain points
+    const tagCounts = new Map<string, number>();
+    for (const story of limitedStories) {
+      const tag = pickPrimaryTag(story);
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+
+    // Sort tags by frequency (most common first)
+    const sortedTags = Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag);
+
+    // Use most common tag as default, or "story" if no tags found
+    const defaultTag = sortedTags.length > 0 ? sortedTags[0] : "story";
+
     if (analysis && Array.isArray(analysis.problemClusters)) {
-      for (const cluster of analysis.problemClusters.slice(0, 10)) {
+      for (let i = 0; i < analysis.problemClusters.slice(0, 10).length; i++) {
+        const cluster = analysis.problemClusters[i];
+        // Distribute tags across pain points based on frequency
+        // Use the tag at position i % sortedTags.length, or defaultTag if empty
+        const assignedTag =
+          sortedTags.length > 0
+            ? sortedTags[i % sortedTags.length]
+            : defaultTag;
+
         painPoints.push({
           id: crypto.randomUUID(),
           search_id: searchId,
           title: cluster.title || "Untitled pain point",
-          subreddit: "hackernews",
+          subreddit: assignedTag,
           mentions_count: cluster.mentionCount || 1,
           severity_score: cluster.severity || null,
         });
