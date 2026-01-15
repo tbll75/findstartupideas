@@ -714,32 +714,32 @@ export function SearchSection() {
           </Accordion>
         </div>
 
+        {/* Global error message (always visible when present) */}
+        {errorMessage && (
+          <div className="mt-6 px-4 py-3 rounded-xl bg-destructive/5 border border-destructive/20 text-sm text-destructive">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Loading/Processing state (shown while search is in progress) */}
+        {isLoading && !errorMessage && (
+          <div className="mt-10 text-center space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <span className="text-lg font-medium">
+                {isPolling
+                  ? "Mining insights from Hacker News..."
+                  : "Starting search..."}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This may take a few moments while we analyze discussions...
+            </p>
+          </div>
+        )}
+
         {showResults && searchResults && (
           <div className="mt-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Error message */}
-            {errorMessage && (
-              <div className="mt-8 px-4 py-3 rounded-xl bg-destructive/5 border border-destructive/20 text-sm text-destructive">
-                {errorMessage}
-              </div>
-            )}
-
-            {/* Loading/Processing state */}
-            {isLoading && !showResults && !errorMessage && (
-              <div className="mt-12 text-center space-y-4">
-                <div className="flex items-center justify-center gap-3">
-                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                  <span className="text-lg font-medium">
-                    {isPolling
-                      ? "Mining insights from Hacker News..."
-                      : "Starting search..."}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  This may take a few moments while we analyze discussions...
-                </p>
-              </div>
-            )}
-
             {/* Results header */}
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
