@@ -428,7 +428,7 @@ export function SearchSection() {
   };
 
   return (
-    <section className="relative py-8 lg:py-10">
+    <section className="relative pb-8 lg:pb-10">
       <div className="fixed top-0 left-0 right-0 z-[100] h-1 pointer-events-none">
         <div
           className={cn(
