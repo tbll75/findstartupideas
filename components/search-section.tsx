@@ -50,95 +50,6 @@ type SearchResultItem = {
   }>;
 };
 
-const mockSearchResults: SearchResultItem[] = [
-  {
-    id: 1,
-    painTitle:
-      "Users struggle with overwhelming feature complexity in project management tools",
-    mentions: 847,
-    tag: "story",
-    quotes: [
-      {
-        text: "Every time I open the app, I spend 10 minutes just trying to find what I need. It's exhausting.",
-        upvotes: 234,
-        author: "u/frustrated_pm",
-      },
-      {
-        text: "I just want to make a simple to-do list without learning a whole new system...",
-        upvotes: 189,
-        author: "u/simple_tasks",
-      },
-      {
-        text: "The learning curve killed my team's adoption. We went back to spreadsheets.",
-        upvotes: 156,
-        author: "u/team_lead_99",
-      },
-    ],
-  },
-  {
-    id: 2,
-    painTitle:
-      "Difficulty syncing data across multiple devices creates workflow disruptions",
-    mentions: 623,
-    tag: "ask_hn",
-    quotes: [
-      {
-        text: "Lost 3 hours of work because my phone didn't sync with desktop. Absolute nightmare.",
-        upvotes: 312,
-        author: "u/sync_issues",
-      },
-      {
-        text: "Why is real-time sync still a problem in 2024? This should be solved by now.",
-        upvotes: 198,
-        author: "u/tech_rant",
-      },
-    ],
-  },
-  {
-    id: 3,
-    painTitle:
-      "Pricing models feel exploitative with essential features locked behind premium tiers",
-    mentions: 1203,
-    tag: "show_hn",
-    quotes: [
-      {
-        text: "Basic export functionality shouldn't be a 'premium' feature. It's borderline predatory.",
-        upvotes: 456,
-        author: "u/indie_dev",
-      },
-      {
-        text: "Started with free tier, got hooked, now paying $30/mo for features that should be standard.",
-        upvotes: 287,
-        author: "u/bootstrapper",
-      },
-      {
-        text: "The bait-and-switch pricing is why I'm building my own alternative.",
-        upvotes: 203,
-        author: "u/fed_up_founder",
-      },
-    ],
-  },
-  {
-    id: 4,
-    painTitle:
-      "Poor customer support response times leave users stranded during critical issues",
-    mentions: 445,
-    tag: "story",
-    quotes: [
-      {
-        text: "Submitted a ticket 2 weeks ago. Still waiting. My business literally depends on this.",
-        upvotes: 178,
-        author: "u/waiting_forever",
-      },
-      {
-        text: "Got a canned response that didn't even address my issue. Feels like talking to a wall.",
-        upvotes: 134,
-        author: "u/support_nightmare",
-      },
-    ],
-  },
-];
-
 export function SearchSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -152,15 +63,16 @@ export function SearchSection() {
   const [timeRange, setTimeRange] = useState("month");
   const [minUpvotes, setMinUpvotes] = useState("10");
   const [sortBy, setSortBy] = useState("relevance");
-  const [searchResults, setSearchResults] = useState<
-    SearchResultItem[] | null
-  >(null);
+  const [searchResults, setSearchResults] = useState<SearchResultItem[] | null>(
+    null
+  );
   const [searchId, setSearchId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasRestoredFromUrlRef = useRef(false);
 
   const filteredSuggestions = popularSearches.filter((s) =>
     s.toLowerCase().includes(query.toLowerCase())
@@ -205,113 +117,124 @@ export function SearchSection() {
   /**
    * Transform SearchResult to UI format
    */
-  const transformSearchResult = useCallback((result: SearchResult): SearchResultItem[] => {
-    // Group quotes by pain point
-    const quotesByPainPoint = new Map<string, Array<{
-      text: string;
-      upvotes: number;
-      author: string;
-      permalink?: string;
-    }>>();
-    
-    result.quotes.forEach((quote) => {
-      if (!quotesByPainPoint.has(quote.painPointId)) {
-        quotesByPainPoint.set(quote.painPointId, []);
-      }
-      const quoteData: {
-        text: string;
-        upvotes: number;
-        author: string;
-        permalink?: string;
-      } = {
-        text: quote.quoteText,
-        upvotes: quote.upvotes,
-        author: quote.authorHandle || "Anonymous",
-      };
-      if (quote.permalink) {
-        quoteData.permalink = quote.permalink;
-      }
-      quotesByPainPoint.get(quote.painPointId)!.push(quoteData);
-    });
+  const transformSearchResult = useCallback(
+    (result: SearchResult): SearchResultItem[] => {
+      // Group quotes by pain point
+      const quotesByPainPoint = new Map<
+        string,
+        Array<{
+          text: string;
+          upvotes: number;
+          author: string;
+          permalink?: string;
+        }>
+      >();
 
-    // Map pain points to UI format
-    return result.painPoints.map((pp, idx) => ({
-      id: idx + 1,
-      painTitle: pp.title,
-      mentions: pp.mentionsCount,
-      tag: pp.sourceTag,
-      quotes: quotesByPainPoint.get(pp.id) || [],
-    }));
-  }, []);
+      result.quotes.forEach((quote) => {
+        if (!quotesByPainPoint.has(quote.painPointId)) {
+          quotesByPainPoint.set(quote.painPointId, []);
+        }
+        const quoteData: {
+          text: string;
+          upvotes: number;
+          author: string;
+          permalink?: string;
+        } = {
+          text: quote.quoteText,
+          upvotes: quote.upvotes,
+          author: quote.authorHandle || "Anonymous",
+        };
+        if (quote.permalink) {
+          quoteData.permalink = quote.permalink;
+        }
+        quotesByPainPoint.get(quote.painPointId)!.push(quoteData);
+      });
+
+      // Map pain points to UI format
+      return result.painPoints.map((pp, idx) => ({
+        id: idx + 1,
+        painTitle: pp.title,
+        mentions: pp.mentionsCount,
+        tag: pp.sourceTag,
+        quotes: quotesByPainPoint.get(pp.id) || [],
+      }));
+    },
+    []
+  );
 
   /**
    * Poll for search results
    */
-  const pollSearchStatus = useCallback(async (id: string, maxAttempts = 20) => {
-    let attempts = 0;
-    
-    const poll = async (): Promise<void> => {
-      if (attempts >= maxAttempts) {
-        setIsPolling(false);
-        setErrorMessage("Search is taking longer than expected. Please refresh the page later.");
-        setIsLoading(false);
-        setLoadingProgress(0);
-        return;
-      }
+  const pollSearchStatus = useCallback(
+    async (id: string, maxAttempts = 20) => {
+      let attempts = 0;
 
-      attempts++;
-
-      try {
-        const response = await fetch(`/api/search-status?searchId=${id}`);
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch search status");
-        }
-
-        const data = await response.json();
-
-        // Check if we got a full SearchResult
-        if (data.status === "completed" && data.painPoints) {
+      const poll = async (): Promise<void> => {
+        if (attempts >= maxAttempts) {
           setIsPolling(false);
+          setErrorMessage(
+            "Search is taking longer than expected. Please refresh the page later."
+          );
           setIsLoading(false);
-          setLoadingProgress(100);
-          
-          const transformed = transformSearchResult(data as SearchResult);
-          setSearchResults(transformed);
-          setShowResults(true);
-          
-          setTimeout(() => {
-            setLoadingProgress(0);
-          }, 300);
+          setLoadingProgress(0);
           return;
         }
 
-        // Check if failed
-        if (data.status === "failed") {
+        attempts++;
+
+        try {
+          const response = await fetch(`/api/search-status?searchId=${id}`);
+
+          if (!response.ok) {
+            throw new Error("Failed to fetch search status");
+          }
+
+          const data = await response.json();
+
+          // Check if we got a full SearchResult
+          if (data.status === "completed" && data.painPoints) {
+            setIsPolling(false);
+            setIsLoading(false);
+            setLoadingProgress(100);
+
+            const transformed = transformSearchResult(data as SearchResult);
+            setSearchResults(transformed);
+            setShowResults(true);
+
+            setTimeout(() => {
+              setLoadingProgress(0);
+            }, 300);
+            return;
+          }
+
+          // Check if failed
+          if (data.status === "failed") {
+            setIsPolling(false);
+            setIsLoading(false);
+            setLoadingProgress(0);
+            setErrorMessage(
+              data.errorMessage || "Search failed. Please try again."
+            );
+            return;
+          }
+
+          // Still processing, poll again
+          if (data.status === "processing" || data.status === "pending") {
+            setTimeout(poll, 2000); // Poll every 2 seconds
+          }
+        } catch (error) {
+          console.error("Error polling search status:", error);
           setIsPolling(false);
           setIsLoading(false);
           setLoadingProgress(0);
-          setErrorMessage(
-            data.errorMessage || "Search failed. Please try again."
-          );
-          return;
+          setErrorMessage("Unable to check search status. Please try again.");
         }
+      };
 
-        // Still processing, poll again
-        if (data.status === "processing" || data.status === "pending") {
-          setTimeout(poll, 2000); // Poll every 2 seconds
-        }
-      } catch (error) {
-        console.error("Error polling search status:", error);
-        setIsPolling(false);
-        setIsLoading(false);
-        setLoadingProgress(0);
-        setErrorMessage("Unable to check search status. Please try again.");
-      }
-    };
-
-    poll();
-  }, [transformSearchResult]);
+      poll();
+    },
+    [transformSearchResult]
+  );
 
   /**
    * Cleanup polling on unmount
@@ -324,15 +247,163 @@ export function SearchSection() {
     };
   }, []);
 
+  /**
+   * Restore search state from URL params on mount
+   */
+  useEffect(() => {
+    // Only restore once on initial mount to avoid infinite loops
+    if (hasRestoredFromUrlRef.current) {
+      return;
+    }
+
+    const urlQuery = searchParams.get("q");
+    const urlTags = searchParams.get("tags");
+    const urlTime = searchParams.get("time");
+    const urlUpvotes = searchParams.get("upvotes");
+    const urlSort = searchParams.get("sort");
+
+    // If there's a query in the URL, restore the state and perform the search
+    if (urlQuery && urlQuery.length >= 2) {
+      setQuery(urlQuery);
+
+      // Restore filter state from URL
+      if (urlTags) {
+        setSelectedTags(urlTags.split(",").filter(Boolean));
+      }
+      if (urlTime) {
+        setTimeRange(urlTime);
+      }
+      if (urlUpvotes) {
+        setMinUpvotes(urlUpvotes);
+      }
+      if (urlSort) {
+        setSortBy(urlSort);
+      }
+
+      // Mark as restored and trigger search
+      hasRestoredFromUrlRef.current = true;
+
+      // Perform the search (backend will check cache first)
+      const performRestoreSearch = async () => {
+        setIsLoading(true);
+        setShowResults(false);
+        setErrorMessage(null);
+        simulateProgress();
+
+        const searchPayload = {
+          topic: urlQuery,
+          tags: urlTags ? urlTags.split(",").filter(Boolean) : [],
+          timeRange: urlTime || "month",
+          minUpvotes: Number(urlUpvotes || "10"),
+          sortBy: urlSort || "relevance",
+        };
+
+        try {
+          const response = await fetch("/api/search", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(searchPayload),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            const message =
+              errorData?.error || "Something went wrong starting your search.";
+            setErrorMessage(message);
+            setIsLoading(false);
+            setLoadingProgress(0);
+            return;
+          }
+
+          const data = await response.json();
+
+          // Check if we got a full SearchResult (cached or completed quickly)
+          if (data.status === "completed" && data.painPoints) {
+            setIsLoading(false);
+            setLoadingProgress(100);
+
+            const transformed = transformSearchResult(data as SearchResult);
+            setSearchResults(transformed);
+            setShowResults(true);
+            setSearchId(data.searchId);
+
+            setTimeout(() => {
+              setLoadingProgress(0);
+            }, 300);
+            return;
+          }
+
+          // Otherwise, we got a searchId and status
+          const restoredSearchId = data.searchId;
+          const status = data.status;
+
+          if (!restoredSearchId) {
+            setIsLoading(false);
+            setLoadingProgress(0);
+            setErrorMessage("Invalid response from server.");
+            return;
+          }
+
+          setSearchId(restoredSearchId);
+
+          // If processing, start polling
+          if (status === "processing" || status === "pending") {
+            setIsPolling(true);
+            await pollSearchStatus(restoredSearchId);
+          } else if (status === "failed") {
+            setIsLoading(false);
+            setLoadingProgress(0);
+            setErrorMessage(
+              data.errorMessage || "Search failed. Please try again."
+            );
+          }
+        } catch (error) {
+          console.error("Error restoring search from URL:", error);
+          setErrorMessage("Unable to restore search. Please try again.");
+          setIsLoading(false);
+          setLoadingProgress(0);
+        }
+      };
+
+      performRestoreSearch();
+    } else {
+      hasRestoredFromUrlRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
   const handleSearch = useCallback(async () => {
     if (query.length < 2) return;
+
+    // Check if we're searching for the exact same thing (avoid unnecessary refetch)
+    const currentParams = new URLSearchParams();
+    currentParams.set("q", query);
+    if (selectedTags.length > 0)
+      currentParams.set("tags", selectedTags.join(","));
+    if (timeRange !== "month") currentParams.set("time", timeRange);
+    if (minUpvotes !== "10") currentParams.set("upvotes", minUpvotes);
+    if (sortBy !== "relevance") currentParams.set("sort", sortBy);
+
+    const currentUrlParams = currentParams.toString();
+    const existingUrlParams = searchParams.toString();
+
+    // If the URL params match exactly and we already have results, don't refetch
+    if (
+      currentUrlParams === existingUrlParams &&
+      showResults &&
+      searchResults
+    ) {
+      return;
+    }
 
     setIsLoading(true);
     setShowResults(false);
     setErrorMessage(null);
     setIsPolling(false);
     setSearchId(null);
-    
+
     // Clear any existing polling
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -341,14 +412,7 @@ export function SearchSection() {
 
     simulateProgress();
 
-    const params = new URLSearchParams();
-    params.set("q", query);
-    if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
-    if (timeRange !== "month") params.set("time", timeRange);
-    if (minUpvotes !== "10") params.set("upvotes", minUpvotes);
-    if (sortBy !== "relevance") params.set("sort", sortBy);
-
-    router.push(`?${params.toString()}`, { scroll: false });
+    router.push(`?${currentUrlParams}`, { scroll: false });
 
     try {
       const response = await fetch("/api/search", {
@@ -381,12 +445,12 @@ export function SearchSection() {
       if (data.status === "completed" && data.painPoints) {
         setIsLoading(false);
         setLoadingProgress(100);
-        
+
         const transformed = transformSearchResult(data as SearchResult);
         setSearchResults(transformed);
         setShowResults(true);
         setSearchId(data.searchId);
-        
+
         setTimeout(() => {
           setLoadingProgress(0);
         }, 300);
@@ -413,7 +477,9 @@ export function SearchSection() {
       } else if (status === "failed") {
         setIsLoading(false);
         setLoadingProgress(0);
-        setErrorMessage(data.errorMessage || "Search failed. Please try again.");
+        setErrorMessage(
+          data.errorMessage || "Search failed. Please try again."
+        );
       }
     } catch (error) {
       console.error("Error calling /api/search:", error);
@@ -431,6 +497,9 @@ export function SearchSection() {
     simulateProgress,
     transformSearchResult,
     pollSearchStatus,
+    searchParams,
+    showResults,
+    searchResults,
   ]);
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -581,46 +650,6 @@ export function SearchSection() {
               </Button>
             </div>
           </div>
-
-          {/* Suggestions dropdown */}
-          {showSuggestions && filteredSuggestions.length > 0 && (
-            <div
-              className="absolute top-full left-0 right-0 mt-3 bg-card rounded-xl overflow-hidden z-10 animate-in fade-in slide-in-from-top-2 duration-200"
-              style={{
-                boxShadow:
-                  "0 4px 8px rgba(0,0,0,0.04), 0 16px 32px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-              <div className="p-2 relative">
-                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <TrendingUp className="w-3 h-3" />
-                  Trending searches
-                </p>
-                {filteredSuggestions.slice(0, 5).map((suggestion, i) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-3 text-left rounded-lg",
-                      "hover:bg-gradient-to-r hover:from-secondary/80 hover:to-secondary/40",
-                      "transition-all duration-200 group"
-                    )}
-                    style={{ animationDelay: `${i * 50}ms` }}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors duration-200">
-                      <TrendingUp className="w-4 h-4 text-muted-foreground group-hover:text-background transition-colors duration-200" />
-                    </div>
-                    <span className="text-sm font-medium">{suggestion}</span>
-                    <span className="ml-auto text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Search
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Advanced Options Accordion */}
@@ -803,7 +832,9 @@ export function SearchSection() {
                 <div className="flex items-center justify-center gap-3">
                   <Loader2 className="w-6 h-6 text-primary animate-spin" />
                   <span className="text-lg font-medium">
-                    {isPolling ? "Mining insights from Hacker News..." : "Starting search..."}
+                    {isPolling
+                      ? "Mining insights from Hacker News..."
+                      : "Starting search..."}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -906,7 +937,8 @@ export function SearchSection() {
                           {/* Mentions count */}
                           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <MessageSquare className="w-3.5 h-3.5" />
-                            {result.mentions.toLocaleString()} {result.mentions === 1 ? "mention" : "mentions"}
+                            {result.mentions.toLocaleString()}{" "}
+                            {result.mentions === 1 ? "mention" : "mentions"}
                           </span>
                         </div>
                       </div>
@@ -946,7 +978,10 @@ export function SearchSection() {
                               <div className="flex items-center gap-3 mt-2">
                                 {quote.author && (
                                   <a
-                                    href={quote.permalink || `https://news.ycombinator.com/user?id=${quote.author}`}
+                                    href={
+                                      quote.permalink ||
+                                      `https://news.ycombinator.com/user?id=${quote.author}`
+                                    }
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer"
