@@ -25,30 +25,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import type { SearchResult } from "@/lib/validation";
-
-const popularSearches = [
-  "Notion",
-  "Shopify",
-  "Freelance",
-  "Remote work",
-  "AI tools",
-  "Side hustle",
-  "SaaS",
-  "Productivity",
-];
-
-type SearchResultItem = {
-  id: number;
-  painTitle: string;
-  mentions: number;
-  tag: string;
-  quotes: Array<{
-    text: string;
-    upvotes: number;
-    author: string;
-    permalink?: string;
-  }>;
-};
+import { popularSearches } from "@/constants";
 
 export function SearchSection() {
   const router = useRouter();
@@ -529,7 +506,7 @@ export function SearchSection() {
                 onClick={handleSearch}
                 disabled={query.length < 2 || isLoading}
                 className={cn(
-                  "h-11 px-6 bg-foreground text-background font-medium rounded-xl",
+                  "cursor-pointer h-11 px-6 bg-foreground text-background font-medium rounded-xl",
                   "disabled:opacity-50 transition-all duration-300",
                   "hover:shadow-[0_4px_16px_rgba(0,0,0,0.2)] hover:-translate-y-0.5",
                   "relative overflow-hidden shimmer-hover",
@@ -853,7 +830,7 @@ export function SearchSection() {
                             <Quote className="w-4 h-4 text-primary/40 flex-shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
                               {quote.permalink &&
-                              !quote.permalink.includes("undefined") ? (
+                                !quote.permalink.includes("undefined") ? (
                                 <a
                                   href={quote.permalink}
                                   target="_blank"
@@ -876,7 +853,7 @@ export function SearchSection() {
                                     <a
                                       href={
                                         quote.permalink &&
-                                        !quote.permalink.includes("undefined")
+                                          !quote.permalink.includes("undefined")
                                           ? quote.permalink
                                           : `https://news.ycombinator.com/user?id=${quote.author}`
                                       }
@@ -922,7 +899,7 @@ export function SearchSection() {
               <div className="flex justify-center pt-4">
                 <Button
                   variant="outline"
-                  className="px-8 py-3 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 bg-transparent"
+                  className="cursor-pointer px-8 py-3 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 bg-transparent"
                   onClick={() =>
                     setVisibleCount((prev) =>
                       Math.min(prev + 5, searchResults.length)

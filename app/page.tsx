@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { HeroSection } from "@/components/hero-section";
+import { Hero } from "@/components/hero";
 import { SearchSection } from "@/components/search-section";
 
 function HomeContent() {
@@ -21,7 +21,7 @@ function HomeContent() {
             backgroundSize: "64px 64px",
           }}
         />
-        <HeroSection />
+        <Hero />
         <SearchSection />
       </main>
     </div>
