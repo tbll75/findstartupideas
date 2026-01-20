@@ -87,10 +87,10 @@ export const SHORT_POLL_MAX_WAIT_MS = 8000;
 export const SHORT_POLL_INTERVAL_MS = 500;
 
 /** Client-side polling interval (ms) */
-export const CLIENT_POLL_INTERVAL_MS = 2000;
+export const CLIENT_POLL_INTERVAL_MS = 2500;
 
 /** Client-side max poll attempts */
-export const CLIENT_MAX_POLL_ATTEMPTS = 20;
+export const CLIENT_MAX_POLL_ATTEMPTS = 30;
 
 // ============================================================================
 // Edge Function
