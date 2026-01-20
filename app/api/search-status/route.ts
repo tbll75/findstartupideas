@@ -1,17 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
-import { getCachedSearchResultById } from "@/lib/cache";
-import { assembleSearchResultFromDB } from "@/lib/db-helpers";
+import { getCachedSearchResultById } from "@/lib/redis";
+import { assembleSearchResultFromDB } from "@/lib/db";
+import {
+  successResponse,
+  badRequestErrorResponse,
+  notFoundErrorResponse,
+  internalErrorResponse,
+  searchFailedResponse,
+} from "@/lib/api";
+import { getQueryParam } from "@/lib/api/request-utils";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const searchId = searchParams.get("searchId");
+  const searchId = getQueryParam(request, "searchId");
 
   if (!searchId) {
-    return NextResponse.json(
-      { error: "Missing required query parameter: searchId" },
-      { status: 400 }
-    );
+    return badRequestErrorResponse("Missing required query parameter: searchId");
   }
 
   try {
@@ -19,7 +23,7 @@ export async function GET(request: NextRequest) {
     const cached = await getCachedSearchResultById(searchId);
     if (cached) {
       console.log(`[GET /api/search-status] Cache hit for ${searchId}`);
-      return NextResponse.json(cached, { status: 200 });
+      return successResponse(cached);
     }
 
     // 2) Fallback to DB
@@ -36,14 +40,11 @@ export async function GET(request: NextRequest) {
         `[GET /api/search-status] DB error for ${searchId}:`,
         error
       );
-      return NextResponse.json(
-        { error: "Failed to fetch search status" },
-        { status: 500 }
-      );
+      return internalErrorResponse("Failed to fetch search status");
     }
 
     if (!data) {
-      return NextResponse.json({ error: "Search not found" }, { status: 404 });
+      return notFoundErrorResponse("Search not found");
     }
 
     // If completed, assemble full result from DB
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
         console.log(
           `[GET /api/search-status] Assembled result from DB for ${searchId}`
         );
-        return NextResponse.json(assembled, { status: 200 });
+        return successResponse(assembled);
       }
 
       // If assembly fails, still return status
@@ -64,30 +65,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Return status-only response for pending/processing/failed or assembly failure
-    const response: {
-      searchId: string;
-      status: string;
-      errorMessage?: string;
-    } = {
-      searchId: data.id,
-      status: data.status,
-    };
-
-    if (data.error_message) {
-      response.errorMessage = data.error_message;
+    if (data.status === "failed") {
+      return searchFailedResponse(
+        data.id,
+        data.error_message || "Search failed"
+      );
     }
 
-    return NextResponse.json(response, {
-      status: data.status === "failed" ? 500 : 200,
+    return successResponse({
+      searchId: data.id,
+      status: data.status,
+      ...(data.error_message && { errorMessage: data.error_message }),
     });
   } catch (error) {
     console.error(
       `[GET /api/search-status] Unexpected error for ${searchId}:`,
       error
     );
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return internalErrorResponse();
   }
 }
