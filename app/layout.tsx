@@ -22,10 +22,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Reminer — Hacker News Pain Point Miner",
+  title: "Reminer — Mine Real Pain Points from Hacker News",
   description:
-    "Discover real customer complaints, validated product ideas, and market opportunities by mining Hacker News discussions. Turn conversations into actionable insights.",
-};
+    "Discover validated product ideas, customer complaints, and market opportunities by analyzing authentic Hacker News discussions. AI-powered user research in seconds.",
+  keywords: [
+    "user pain points",
+    "product validation",
+    "market research",
+    "HackerNews analysis",
+    "startup ideas",
+    "competitor analysis",
+    "user research tool",
+  ],
+}
 
 export const viewport: Viewport = {
   themeColor: "#f5f4f0",
