@@ -112,6 +112,7 @@ export type HNStory = {
   id: string;
   title: string;
   url: string | null;
+  permalink: string;
   text: string | null;
   points: number;
   author: string | null;

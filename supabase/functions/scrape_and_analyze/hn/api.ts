@@ -96,6 +96,7 @@ export async function fetchHNStories(
         id: String(id),
         title: hit.title ?? hit.story_title ?? "",
         url: hit.url ?? hit.story_url ?? null,
+        permalink: `https://news.ycombinator.com/item?id=${hit.story_id}`,
         text:
           typeof hit.story_text === "string"
             ? hit.story_text
