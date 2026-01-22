@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useSearch, useSearchFilters } from "./hooks";
 import { SearchProgress } from "./SearchProgress";
 import { SearchInput } from "./SearchInput";
 import { SearchFilters } from "./SearchFilters";
-import { SearchResults } from "./SearchResults";
 import { SearchLoading } from "./SearchLoading";
 import { SearchError } from "./SearchError";
+import { LiveStoriesFeed } from "./LiveStoriesFeed";
+import { LiveCommentsFeed } from "./LiveCommentsFeed";
+import { LivePainPointsFeed } from "./LivePainPointsFeed";
 
 /**
  * Main search section component
@@ -20,6 +22,12 @@ export function SearchSection() {
     searchResults,
     errorMessage,
     loadingProgress,
+    phase,
+    stories,
+    commentsCount,
+    comments,
+    painPointsIncremental,
+    liveAnalysisSummary,
     performSearch,
     resetSearch,
   } = useSearch();
@@ -73,11 +81,36 @@ export function SearchSection() {
     });
   }, [urlSearchParams, performSearch, resetSearch]);
 
-  const showResults = searchResults && searchResults.length > 0;
+  // Check if we have any live data to show
+  const hasLiveData = useMemo(() => {
+    return stories.length > 0 || comments.length > 0 || painPointsIncremental.length > 0;
+  }, [stories.length, comments.length, painPointsIncremental.length]);
+
+  // Remove debug logging
+  // console.log("[SearchSection] State:", {
+  //   isLoading,
+  //   phase,
+  //   storiesCount: stories.length,
+  //   commentsCount,
+  //   commentsLength: comments.length,
+  //   painPointsCount: painPointsIncremental.length,
+  //   showLiveFeeds: isLoading && !(searchResults && searchResults.length > 0),
+  // });
+
+  // Show live feeds when we have live data OR when loading (for brand new searches)
+  // Keep them visible even when final results arrive
+  const showLiveFeeds = useMemo(() => {
+    return hasLiveData || isLoading;
+  }, [hasLiveData, isLoading]);
+
+  // Show initial loading only when loading, no error, and no live data yet
+  const showInitialLoading = useMemo(() => {
+    return isLoading && !errorMessage && !hasLiveData;
+  }, [isLoading, errorMessage, hasLiveData]);
 
   return (
     <section className="relative pb-8 lg:pb-10">
-      <SearchProgress progress={loadingProgress} />
+      <SearchProgress progress={loadingProgress} phase={phase} />
 
       <div className="max-w-3xl mx-auto px-6 lg:px-8">
         {/* Search Input */}
@@ -104,11 +137,43 @@ export function SearchSection() {
         {/* Error Message */}
         {errorMessage && <SearchError message={errorMessage} />}
 
-        {/* Loading State */}
-        {isLoading && !errorMessage && <SearchLoading isPolling={isPolling} />}
+        {/* Initial Loading State (before any data arrives) */}
+        {showInitialLoading && (
+          <SearchLoading
+            isPolling={isPolling}
+            phase={phase}
+            storiesCount={stories.length}
+            commentsCount={commentsCount}
+          />
+        )}
 
-        {/* Results */}
-        {showResults && <SearchResults results={searchResults} query={query} />}
+        {/* Live Feeds Section - Show when we have live data or when loading */}
+        {showLiveFeeds && (
+          <>
+            {/* Phase 1: Live Stories Feed */}
+            {stories.length > 0 && (
+              <LiveStoriesFeed stories={stories} phase={phase} />
+            )}
+
+            {/* Phase 2: Live Comments Feed */}
+            {(comments.length > 0 || commentsCount > 0 || phase === "comments" || phase === "analysis" || phase === "completed") && (
+              <LiveCommentsFeed
+                comments={comments}
+                commentsCount={commentsCount}
+                phase={phase}
+              />
+            )}
+
+            {/* Phase 3: Live Pain Points Feed (AI Analysis) */}
+            {(painPointsIncremental.length > 0 || phase === "analysis" || phase === "completed") && (
+              <LivePainPointsFeed
+                painPoints={painPointsIncremental}
+                phase={phase}
+                liveAnalysisSummary={liveAnalysisSummary}
+              />
+            )}
+          </>
+        )}
       </div>
     </section>
   );

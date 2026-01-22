@@ -147,7 +147,7 @@ export function SearchInput({
       </div>
 
       {/* Suggestions dropdown */}
-      {showSuggestions && filteredSuggestions.length > 0 && (
+      {/* {showSuggestions && filteredSuggestions.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-card rounded-xl border border-border shadow-lg z-50">
           {filteredSuggestions.map((suggestion) => (
             <button
@@ -159,7 +159,7 @@ export function SearchInput({
             </button>
           ))}
         </div>
-      )}
+      )} */}
     </div>
   );
 }
