@@ -89,6 +89,19 @@ create table if not exists public.api_usage (
 -- INDEXES FOR PERFORMANCE
 -- ============================================================================
 
+-- Search events: incremental streaming of progress via Supabase Realtime
+create table if not exists public.search_events (
+  id uuid primary key default uuid_generate_v4(),
+  search_id uuid not null references public.searches(id) on delete cascade,
+  phase text not null check (phase in ('stories', 'comments', 'analysis')),
+  event_type text not null check (event_type in ('story_discovered', 'comment_discovered', 'phase_progress')),
+  payload jsonb not null,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create index if not exists idx_search_events_search_id_created_at
+  on public.search_events (search_id, created_at);
+
 -- Searches: Composite index for cache lookup by normalized parameters
 create index if not exists idx_searches_cache_lookup
   on public.searches (lower(topic), time_range, min_upvotes, sort_by)
@@ -284,6 +297,7 @@ alter table public.pain_point_quotes enable row level security;
 alter table public.ai_analyses enable row level security;
 alter table public.job_logs enable row level security;
 alter table public.api_usage enable row level security;
+alter table public.search_events enable row level security;
 
 -- ============================================================================
 -- RLS POLICIES: searches
@@ -405,6 +419,23 @@ create policy api_usage_service_role_only
   with check (auth.role() = 'service_role');
 
 -- ============================================================================
+-- RLS POLICIES: search_events
+-- ============================================================================
+
+drop policy if exists search_events_select_public on public.search_events;
+create policy search_events_select_public
+  on public.search_events
+  for select
+  using (true);
+
+drop policy if exists search_events_write_service_role on public.search_events;
+create policy search_events_write_service_role
+  on public.search_events
+  for all
+  using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+-- ============================================================================
 -- TRIGGERS FOR AUTO-UPDATING TIMESTAMPS
 -- ============================================================================
 
@@ -438,6 +469,7 @@ comment on table public.pain_point_quotes is 'Supporting quotes for each pain po
 comment on table public.ai_analyses is 'AI-generated summaries and product ideas';
 comment on table public.job_logs is 'Internal job execution logs (service role only)';
 comment on table public.api_usage is 'API cost tracking for budgeting (service role only)';
+comment on table public.search_events is 'Incremental per-search events for realtime progress (stories, comments, analysis)';
 
 comment on column public.searches.subreddits is 'Array of HN tags (e.g., story, ask_hn, show_hn)';
 comment on column public.searches.retry_count is 'Number of retry attempts for failed jobs';

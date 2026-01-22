@@ -3,14 +3,13 @@
  * Helpers for invoking the scrape_and_analyze edge function
  */
 
-import { EDGE_FUNCTION_TRIGGER_TIMEOUT_MS } from "@/shared/constants";
-
 /**
  * Trigger the scrape_and_analyze edge function
- * Returns true if successfully triggered (doesn't wait for completion)
+ * Fire-and-forget: Returns immediately after sending the request
+ * The edge function runs asynchronously and emits events via Realtime
  *
  * @param searchId - UUID of the search to process
- * @returns True if successfully triggered
+ * @returns True if the request was sent successfully
  */
 export async function triggerEdgeFunction(searchId: string): Promise<boolean> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,25 +23,48 @@ export async function triggerEdgeFunction(searchId: string): Promise<boolean> {
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/scrape_and_analyze`;
 
   try {
-    // Fire and forget - don't wait for completion
-    const response = await fetch(edgeFunctionUrl, {
+    // Fire-and-forget: Send the request but don't wait for response
+    // This prevents timeout issues from blocking the API response
+    const controller = new AbortController();
+    
+    // Set a short timeout just for the initial connection (5 seconds)
+    // The edge function itself can run much longer
+    const connectionTimeout = setTimeout(() => controller.abort(), 5000);
+
+    fetch(edgeFunctionUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ searchId }),
-      // Don't wait forever for edge function
-      signal: AbortSignal.timeout(EDGE_FUNCTION_TRIGGER_TIMEOUT_MS),
-    });
+      signal: controller.signal,
+    })
+      .then((response) => {
+        clearTimeout(connectionTimeout);
+        if (!response.ok) {
+          console.warn(
+            `[triggerEdgeFunction] Edge function returned ${response.status} for ${searchId}`
+          );
+        }
+      })
+      .catch((err) => {
+        clearTimeout(connectionTimeout);
+        // Log but don't fail - the edge function may still run
+        // Common reasons: connection timeout, network issues
+        if (err.name === "AbortError") {
+          console.log(
+            `[triggerEdgeFunction] Connection timeout for ${searchId} (edge function may still be running)`
+          );
+        } else {
+          console.error(
+            `[triggerEdgeFunction] Async invocation error for ${searchId}:`,
+            err.message
+          );
+        }
+      });
 
-    if (!response.ok) {
-      console.error(
-        `[triggerEdgeFunction] Edge function returned ${response.status}`
-      );
-      return false;
-    }
-
+    // Return immediately - we don't wait for the edge function response
     return true;
   } catch (err) {
     console.error("[triggerEdgeFunction] Failed to invoke edge function", err);

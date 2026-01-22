@@ -18,6 +18,7 @@ import {
   MAX_QUOTES_PER_PAIN_POINT,
   MAX_QUOTE_TEXT_LENGTH,
   GEMINI_COST_PER_MILLION_TOKENS,
+  GEMINI_COMMENT_MAX_LENGTH,
 } from "./config.ts";
 
 // Types
@@ -52,11 +53,22 @@ import {
   insertQuotes,
   insertAiAnalysis,
   trackApiUsage,
+  insertSearchEvents,
 } from "./db/operations.ts";
 import { logJob } from "./db/logging.ts";
 
 // Redis
 import { cacheSearchResult } from "./redis/client.ts";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Batch size for emitting story events (to avoid overwhelming Realtime) */
+const STORY_EVENT_BATCH_SIZE = 10;
+
+/** Delay between story event batches (ms) */
+const STORY_EVENT_BATCH_DELAY_MS = 100;
 
 // ============================================================================
 // Main Handler
@@ -144,7 +156,9 @@ serve(async (req) => {
       minUpvotes: search.min_upvotes ?? 0,
     };
 
+    // =========================================================================
     // STEP 1: Fetch HN stories
+    // =========================================================================
     console.log(`[${searchId}] Fetching HN stories...`);
     const stories = await withRetry(
       () => fetchHNStories(hnParams, abortController.signal),
@@ -156,7 +170,41 @@ serve(async (req) => {
     console.log(`[${searchId}] Found ${stories.length} stories`);
     const limitedStories = stories.slice(0, HN_MAX_STORIES);
 
+    // Emit story_discovered events in batches for better Realtime propagation
+    // This gives the client time to subscribe and receive events
+    for (let i = 0; i < limitedStories.length; i += STORY_EVENT_BATCH_SIZE) {
+      const batch = limitedStories.slice(i, i + STORY_EVENT_BATCH_SIZE);
+      
+      try {
+        await insertSearchEvents(
+          supabase,
+          batch.map((story) => ({
+            search_id: searchId,
+            phase: "stories" as const,
+            event_type: "story_discovered" as const,
+            payload: {
+              id: story.id,
+              title: story.title,
+              url: story.permalink,
+              points: story.points,
+              tag: pickPrimaryTag(story),
+              createdAt: story.createdAt,
+            },
+          }))
+        );
+      } catch (err) {
+        console.error(`[${searchId}] Failed to emit story events batch`, err);
+      }
+
+      // Small delay between batches to allow Realtime to propagate
+      if (i + STORY_EVENT_BATCH_SIZE < limitedStories.length) {
+        await sleep(STORY_EVENT_BATCH_DELAY_MS);
+      }
+    }
+
+    // =========================================================================
     // STEP 2: Fetch comments for top stories
+    // =========================================================================
     const comments = new Map<string, HNComment[]>();
     const storiesToFetchComments = limitedStories.slice(
       0,
@@ -166,6 +214,8 @@ serve(async (req) => {
       `[${searchId}] Fetching comments for ${storiesToFetchComments.length} stories`
     );
 
+    let totalCommentsSoFar = 0;
+
     for (const story of storiesToFetchComments) {
       const cs = await withRetry(
         () => fetchHNComments(story.id, abortController.signal),
@@ -174,6 +224,46 @@ serve(async (req) => {
         `${searchId}-fetch-comments-${story.id}`
       );
       comments.set(story.id, cs);
+      totalCommentsSoFar += cs.length;
+
+      // Emit a phase_progress event per story to update live counters
+      try {
+        // Prepare a small set of top comments as snippets for realtime UI
+        const topComments = cs
+          .slice()
+          .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
+          .slice(0, 3)
+          .map((comment) => ({
+            id: comment.id,
+            snippet: stripHtml(comment.text ?? "").slice(
+              0,
+              GEMINI_COMMENT_MAX_LENGTH
+            ),
+            author: comment.author ?? null,
+            upvotes: comment.points ?? 0,
+            permalink: comment.permalink,
+          }));
+
+        await insertSearchEvents(supabase, [
+          {
+            search_id: searchId,
+            phase: "comments" as const,
+            event_type: "phase_progress" as const,
+            payload: {
+              storyId: story.id,
+              commentsForStory: cs.length,
+              totalCommentsSoFar,
+              comments: topComments,
+            },
+          },
+        ]);
+      } catch (err) {
+        console.error(
+          `[${searchId}] Failed to emit comment progress event for story ${story.id}`,
+          err
+        );
+      }
+
       await sleep(HN_COMMENT_FETCH_DELAY_MS);
     }
 
@@ -189,8 +279,29 @@ serve(async (req) => {
 
     console.log(`[${searchId}] Total comments: ${totalComments}`);
 
+    // =========================================================================
     // STEP 3: Call Gemini for analysis
+    // =========================================================================
     console.log(`[${searchId}] Calling Gemini...`);
+    
+    // Emit analysis phase start event
+    try {
+      await insertSearchEvents(supabase, [
+        {
+          search_id: searchId,
+          phase: "analysis" as const,
+          event_type: "phase_progress" as const,
+          payload: {
+            status: "started",
+            totalStories: limitedStories.length,
+            totalComments,
+          },
+        },
+      ]);
+    } catch (err) {
+      console.error(`[${searchId}] Failed to emit analysis start event`, err);
+    }
+
     const analysis = await withRetry(
       () =>
         callGeminiForAnalysis({
@@ -222,7 +333,9 @@ serve(async (req) => {
       );
     }
 
+    // =========================================================================
     // STEP 4: Store search_results metadata
+    // =========================================================================
     const totalMentions = totalComments;
 
     const searchResultsRow = await insertSearchResults(supabase, {
@@ -238,7 +351,9 @@ serve(async (req) => {
       throw new Error("Failed to insert search_results");
     }
 
+    // =========================================================================
     // STEP 5: Store pain points from Gemini analysis
+    // =========================================================================
     const painPoints: PainPointRow[] = [];
     const sortedTags = getSortedTags(limitedStories);
     const defaultTag = sortedTags.length > 0 ? sortedTags[0] : "story";
@@ -294,7 +409,9 @@ serve(async (req) => {
     // Reload persisted pain points
     const persistedPainPoints = await getPainPoints(supabase, searchId);
 
+    // =========================================================================
     // STEP 6: Store quotes from Gemini examples
+    // =========================================================================
     const quotes: PainPointQuoteRow[] = [];
 
     if (analysis && Array.isArray(analysis.problemClusters)) {
@@ -387,7 +504,9 @@ serve(async (req) => {
 
     console.log(`[${searchId}] Stored ${quotes.length} quotes`);
 
+    // =========================================================================
     // STEP 7: Store AI analysis
+    // =========================================================================
     let analysisRow = null;
 
     if (analysis && analysis.summary) {
@@ -401,7 +520,30 @@ serve(async (req) => {
       });
     }
 
+    // Emit a final analysis phase_progress event
+    try {
+      await insertSearchEvents(supabase, [
+        {
+          search_id: searchId,
+          phase: "analysis" as const,
+          event_type: "phase_progress" as const,
+          payload: {
+            status: "completed",
+            painPoints: persistedPainPoints.length,
+            quotes: quotes.length,
+          },
+        },
+      ]);
+    } catch (err) {
+      console.error(
+        `[${searchId}] Failed to emit analysis progress event`,
+        err
+      );
+    }
+
+    // =========================================================================
     // STEP 8: Assemble payload and cache in Redis
+    // =========================================================================
     const payload: SearchResultPayload = {
       searchId,
       status: "completed",

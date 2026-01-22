@@ -55,6 +55,15 @@ export type AiAnalysisRow = {
   tokens_used: number | null;
 };
 
+export type SearchEventRow = {
+  id: string;
+  search_id: string;
+  phase: "stories" | "comments" | "analysis";
+  event_type: "story_discovered" | "comment_discovered" | "phase_progress";
+  payload: unknown;
+  created_at?: string;
+};
+
 // ============================================================================
 // API Payload Types
 // ============================================================================

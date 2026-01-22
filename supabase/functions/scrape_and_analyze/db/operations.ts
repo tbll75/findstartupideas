@@ -10,6 +10,7 @@ import type {
   PainPointRow,
   PainPointQuoteRow,
   AiAnalysisRow,
+  SearchEventRow,
 } from "../types.ts";
 
 type SupabaseClient = ReturnType<typeof createClient>;
@@ -182,5 +183,29 @@ export async function trackApiUsage(
     });
   } catch (err) {
     console.error("[trackApiUsage] Failed to track usage", err);
+  }
+}
+
+/**
+ * Insert incremental search events (stories/comments/progress)
+ * Best-effort: logs and continues on error.
+ */
+export async function insertSearchEvents(
+  supabase: SupabaseClient,
+  events: Omit<SearchEventRow, "id">[]
+): Promise<void> {
+  if (!events.length) return;
+
+  const payload = events.map((evt) => ({
+    search_id: evt.search_id,
+    phase: evt.phase,
+    event_type: evt.event_type,
+    payload: evt.payload,
+  }));
+
+  const { error } = await supabase.from("search_events").insert(payload);
+
+  if (error) {
+    console.error("[insertSearchEvents] Failed to insert events", error);
   }
 }
