@@ -99,7 +99,7 @@ export function Header() {
               <Button
                 size="sm"
                 className={cn(
-                  "h-10 px-5 bg-foreground text-background font-medium rounded-xl text-[14px]",
+                  "cursor-pointer h-10 px-5 bg-foreground text-background font-medium rounded-xl text-[14px]",
                   "shadow-elevation-1 hover:shadow-elevation-2",
                   "transition-all duration-300 btn-press shimmer-hover group"
                 )}

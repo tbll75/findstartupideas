@@ -54,7 +54,7 @@ export function HowItWorksSection() {
     <section
       ref={sectionRef}
       id="how-it-works"
-      className="relative py-28 lg:py-36 overflow-hidden"
+      className="relative py-28 overflow-hidden"
     >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-secondary/40 via-secondary/25 to-background" />
@@ -118,7 +118,7 @@ export function HowItWorksSection() {
                 )}
               >
                 {/* Progress bar */}
-                <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-3xl overflow-hidden bg-border/30">
+                <div className="absolute top-0 left-1 right-1 h-2 rounded-t-4xl overflow-hidden bg-border/30">
                   <div 
                     className={cn(
                       "h-full transition-all duration-100 ease-linear",
@@ -203,23 +203,23 @@ export function HowItWorksSection() {
         {/* Benefits Card */}
         <div
           className={cn(
-            "max-w-4xl mx-auto transition-all duration-700 delay-400",
+            "max-w-2xl mx-auto transition-all duration-700 delay-400",
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          <div className="relative bg-card rounded-3xl border border-border/50 p-9 lg:p-11 shadow-card overflow-hidden">
+          <div className="relative bg-card rounded-3xl border border-border/50 p-9 shadow-card overflow-hidden">
             {/* Subtle gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.015] to-transparent pointer-events-none" />
             
             <div className="relative z-10">
-              <h3 className="text-center text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-8">
+              <h3 className="text-center font-semibold text-muted-foreground uppercase tracking-wider mb-8">
                 What you get with Reminer
               </h3>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid justify-center">
                 {benefits.map((benefit, index) => (
                   <div
                     key={index}
-                    className="flex items-start gap-4 p-4 rounded-xl hover:bg-secondary/40 transition-colors duration-200"
+                    className="flex items-start gap-4 p-3 rounded-xl hover:bg-secondary/40 transition-colors duration-200"
                   >
                     <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center mt-0.5">
                       <Check className="w-3.5 h-3.5 text-primary" />

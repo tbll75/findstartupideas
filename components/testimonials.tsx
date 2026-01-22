@@ -41,7 +41,7 @@ export function TestimonialsSection() {
     <section
       ref={sectionRef}
       id="testimonials"
-      className="relative py-28 lg:py-36 overflow-hidden"
+      className="relative py-28 overflow-hidden"
     >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-secondary/40 via-secondary/25 to-background" />

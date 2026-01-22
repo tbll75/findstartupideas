@@ -32,7 +32,7 @@ export function UseCasesSection() {
     <section
       ref={sectionRef}
       id="use-cases"
-      className="relative py-28 lg:py-36 overflow-hidden"
+      className="relative py-28 overflow-hidden"
     >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-secondary/25" />

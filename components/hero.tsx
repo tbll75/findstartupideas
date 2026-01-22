@@ -70,7 +70,7 @@ export function HeroSection() {
           {/* Announcement badge */}
           <div
             className={cn(
-              "inline-flex items-center gap-3 px-5 py-2.5 rounded-full mb-10 transition-all duration-700",
+              "inline-flex items-center gap-3 px-5 py-2.5 rounded-full mb-6 transition-all duration-700",
               "bg-card border border-border/50 shadow-card",
               mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             )}
@@ -147,7 +147,7 @@ export function HeroSection() {
               <Button
                 size="lg"
                 className={cn(
-                  "h-14 px-8 bg-foreground text-background font-semibold rounded-2xl text-base",
+                  "cursor-pointer h-14 px-8 bg-foreground text-background font-semibold rounded-2xl text-base",
                   "shadow-elevation-2 hover:shadow-elevation-3",
                   "transition-all duration-300 btn-press shimmer-hover group"
                 )}

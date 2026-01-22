@@ -31,7 +31,7 @@ export function FAQSection() {
     <section
       ref={sectionRef}
       id="faq"
-      className="relative py-28 lg:py-36 overflow-hidden"
+      className="relative py-28 overflow-hidden"
     >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-background to-secondary/15" />
@@ -78,7 +78,7 @@ export function FAQSection() {
                 <button
                   type="button"
                   onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="w-full flex items-start justify-between gap-4 p-6 text-left focus-ring rounded-2xl"
+                  className="cursor-pointer w-full flex items-start justify-between gap-4 p-6 text-left focus-ring rounded-2xl"
                   aria-expanded={isOpen}
                 >
                   <span className={cn(
@@ -120,7 +120,7 @@ export function FAQSection() {
         </div>
 
         {/* Contact CTA */}
-        <div
+        {/* <div
           className={cn(
             "mt-14 text-center transition-all duration-700 delay-400",
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
@@ -135,7 +135,7 @@ export function FAQSection() {
               Get in touch
             </a>
           </p>
-        </div>
+        </div> */}
       </div>
     </section>
   )

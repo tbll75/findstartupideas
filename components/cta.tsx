@@ -43,7 +43,7 @@ export function CTASection() {
     <section
       ref={sectionRef}
       onMouseMove={handleMouseMove}
-      className="relative py-28 lg:py-36 overflow-hidden"
+      className="relative py-28 overflow-hidden"
     >
       {/* Dark background */}
       <div className="absolute inset-0 bg-foreground" />
@@ -135,7 +135,7 @@ export function CTASection() {
               <Button
                 size="lg"
                 className={cn(
-                  "h-14 px-9 bg-white text-foreground font-semibold rounded-2xl text-base",
+                  "cursor-pointer h-14 px-9 bg-white text-foreground font-semibold rounded-2xl text-base",
                   "shadow-[0_2px_16px_rgba(255,255,255,0.12),0_8px_32px_rgba(255,255,255,0.08)]",
                   "hover:shadow-[0_4px_24px_rgba(255,255,255,0.18),0_12px_40px_rgba(255,255,255,0.12)]",
                   "transition-all duration-300 btn-press group"
