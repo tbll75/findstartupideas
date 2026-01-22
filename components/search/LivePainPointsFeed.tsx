@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
-import { Sparkles, TrendingUp, Quote, User, ArrowBigUp, ExternalLink } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Sparkles, TrendingUp, Quote, User, ArrowBigUp, ExternalLink, Share2 } from "lucide-react";
 import type { SearchResultItem } from "@/types";
 import { getHNTagLabel } from "./utils/transform-results";
+import { ShareToolbar } from "./ShareToolbar";
+import { ShareModal } from "./ShareModal";
 
 interface LivePainPointsFeedProps {
   painPoints: SearchResultItem[];
   phase: string;
   liveAnalysisSummary?: string | null;
+  topic?: string;
 }
 
 /**
@@ -19,18 +22,32 @@ export function LivePainPointsFeed({
   painPoints,
   phase,
   liveAnalysisSummary,
+  topic = "",
 }: LivePainPointsFeedProps) {
   // Memoize pain points to prevent unnecessary re-renders
   const displayPainPoints = useMemo(() => painPoints, [painPoints]);
 
+  // State for individual pain point sharing
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedPainPointIndex, setSelectedPainPointIndex] = useState<number | undefined>(undefined);
+
+  // Handle individual pain point share
+  const handleSharePainPoint = useCallback((index: number) => {
+    setSelectedPainPointIndex(index);
+    setShareModalOpen(true);
+  }, []);
+
   // Don't render if no pain points and not in analysis phase
   if (!painPoints.length && phase !== "analysis") return null;
+
+  // Show share toolbar when we have pain points (completed or analysis phase with data)
+  const showShareToolbar = painPoints.length > 0 && (phase === "completed" || phase === "analysis");
 
   return (
     <div className="mt-8 space-y-6">
       {/* Header Section */}
       <div className="relative">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-purple-500/5 flex items-center justify-center shadow-elevation-2">
@@ -55,14 +72,25 @@ export function LivePainPointsFeed({
             </div>
           </div>
 
-          {phase === "analysis" && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
-              <div className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
-              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
-                Analyzing
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Share Toolbar */}
+            {showShareToolbar && (
+              <ShareToolbar
+                topic={topic}
+                painPoints={painPoints}
+                summary={liveAnalysisSummary}
+              />
+            )}
+
+            {phase === "analysis" && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <div className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
+                <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
+                  Analyzing
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Progress indicator line */}
@@ -92,7 +120,13 @@ export function LivePainPointsFeed({
       {displayPainPoints.length > 0 && (
         <div className="space-y-4">
           {displayPainPoints.map((painPoint, index) => (
-            <PainPointItem key={`${(painPoint as any).__painPointId || painPoint.id}-${index}`} painPoint={painPoint} index={index} />
+            <PainPointItem
+              key={`${(painPoint as any).__painPointId || painPoint.id}-${index}`}
+              painPoint={painPoint}
+              index={index}
+              onShare={() => handleSharePainPoint(index)}
+              showShareButton={phase === "completed" || phase === "analysis"}
+            />
           ))}
         </div>
       )}
@@ -121,6 +155,17 @@ export function LivePainPointsFeed({
           </div>
         </div>
       )}
+
+      {/* Individual Pain Point Share Modal */}
+      <ShareModal
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+        topic={topic}
+        painPoints={painPoints}
+        summary={liveAnalysisSummary}
+        selectedPainPointIndex={selectedPainPointIndex}
+        mode="screenshot"
+      />
     </div>
   );
 }
@@ -128,7 +173,17 @@ export function LivePainPointsFeed({
 /**
  * Individual pain point card with quotes
  */
-function PainPointItem({ painPoint, index }: { painPoint: SearchResultItem; index: number }) {
+function PainPointItem({
+  painPoint,
+  index,
+  onShare,
+  showShareButton,
+}: {
+  painPoint: SearchResultItem;
+  index: number;
+  onShare: () => void;
+  showShareButton: boolean;
+}) {
   return (
     <div
       className="group relative animate-reveal-up"
@@ -176,6 +231,17 @@ function PainPointItem({ painPoint, index }: { painPoint: SearchResultItem; inde
                 </span>
               </div>
             </div>
+
+            {/* Share Button */}
+            {showShareButton && (
+              <button
+                onClick={onShare}
+                className="p-2 rounded-lg bg-secondary/50 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                title="Share this pain point"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Quotes Section */}

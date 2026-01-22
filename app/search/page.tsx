@@ -2,6 +2,62 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { SearchSection } from "@/components/search-section";
+import type { Metadata } from "next";
+
+interface SearchPageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+/**
+ * Generate dynamic metadata for search pages
+ * Creates unique OG images for each search topic
+ */
+export async function generateMetadata({
+  searchParams,
+}: SearchPageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const query = typeof params.q === "string" ? params.q : undefined;
+  const searchId = typeof params.searchId === "string" ? params.searchId : undefined;
+
+  const title = query
+    ? `${query} Pain Points — Reminer`
+    : "Search Pain Points — Reminer";
+
+  const description = query
+    ? `Discover real user pain points about "${query}" from Hacker News discussions. AI-powered user research.`
+    : "Discover validated product ideas and customer complaints by analyzing authentic Hacker News discussions.";
+
+  // Build OG image URL
+  const ogParams = new URLSearchParams();
+  if (query) ogParams.set("q", query);
+  if (searchId) ogParams.set("searchId", searchId);
+  const ogImageUrl = `/api/og${ogParams.toString() ? `?${ogParams.toString()}` : ""}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      siteName: "Reminer",
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: query ? `Pain points for ${query}` : "Reminer - Mine Pain Points from Hacker News",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImageUrl],
+    },
+  };
+}
 
 function SearchContent() {
   return (

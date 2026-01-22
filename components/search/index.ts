@@ -12,6 +12,9 @@ export { SearchError } from "./SearchError";
 export { SearchSkeleton } from "./SearchSkeleton";
 export { PainPointCard } from "./PainPointCard";
 export { QuoteItem } from "./QuoteItem";
+export { ShareToolbar } from "./ShareToolbar";
+export { ShareModal } from "./ShareModal";
+export { ShareableCard } from "./ShareableCard";
 
 // Hooks
 export { useSearch, useSearchFilters } from "./hooks";

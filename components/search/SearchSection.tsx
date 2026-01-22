@@ -170,6 +170,7 @@ export function SearchSection() {
                 painPoints={painPointsIncremental}
                 phase={phase}
                 liveAnalysisSummary={liveAnalysisSummary}
+                topic={urlSearchParams?.get("q") || query}
               />
             )}
           </>
