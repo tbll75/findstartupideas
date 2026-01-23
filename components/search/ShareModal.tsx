@@ -134,7 +134,7 @@ export function ShareModal({
     }
 
     // Build share URL
-    const shareUrl = `${window.location.origin}/search?q=${encodeURIComponent(topic)}`;
+    const shareUrl = `${window.location.origin}/?q=${encodeURIComponent(topic)}`;
     const intentUrl = generateTwitterIntent(tweetText, shareUrl);
 
     // If in twitter mode, also capture and copy image first

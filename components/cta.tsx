@@ -2,7 +2,6 @@
 
 import React from "react"
 import { useEffect, useRef, useState } from "react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -131,22 +130,21 @@ export function CTASection() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
-            <Link href="/search">
-              <Button
-                size="lg"
-                className={cn(
-                  "cursor-pointer h-14 px-9 bg-white text-foreground font-semibold rounded-2xl text-base",
-                  "shadow-[0_2px_16px_rgba(255,255,255,0.12),0_8px_32px_rgba(255,255,255,0.08)]",
-                  "hover:shadow-[0_4px_24px_rgba(255,255,255,0.18),0_12px_40px_rgba(255,255,255,0.12)]",
-                  "transition-all duration-300 btn-press group"
-                )}
-              >
-                <span className="flex items-center gap-2.5">
-                  Start Searching Now
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </span>
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className={cn(
+                "cursor-pointer h-14 px-9 bg-white text-foreground font-semibold rounded-2xl text-base",
+                "shadow-[0_2px_16px_rgba(255,255,255,0.12),0_8px_32px_rgba(255,255,255,0.08)]",
+                "hover:shadow-[0_4px_24px_rgba(255,255,255,0.18),0_12px_40px_rgba(255,255,255,0.12)]",
+                "transition-all duration-300 btn-press group"
+              )}
+            >
+              <span className="flex items-center gap-2.5">
+                Start Searching Now
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+              </span>
+            </Button>
             <a
               href="#how-it-works"
               className={cn(

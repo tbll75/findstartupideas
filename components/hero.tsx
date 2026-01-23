@@ -1,21 +1,43 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Sparkles, ArrowRight, Play } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Sparkles, Search, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { trustFeatures } from "@/constants"
+import { Button } from "@/components/ui/button"
 
 export function HeroSection() {
   const [mounted, setMounted] = useState(false)
+  const [query, setQuery] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    // Sync query from URL on mount
+    const urlQuery = searchParams.get("q")
+    if (urlQuery) {
+      setQuery(urlQuery)
+    }
+  }, [searchParams])
+
+  const handleSearch = useCallback(() => {
+    if (query.length < 2) return
+    
+    const params = new URLSearchParams()
+    params.set("q", query)
+    router.push(`/?${params.toString()}`, { scroll: false })
+  }, [query, router])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch()
+    }
+  }, [handleSearch])
 
   return (
-    <section className="relative min-h-[92vh] flex items-center pt-28 pb-20 overflow-hidden">
+    <section className="relative min-h-[60vh] flex items-center pt-28 overflow-hidden">
       {/* Premium layered background */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         {/* Primary gradient dome */}
@@ -127,7 +149,7 @@ export function HeroSection() {
           {/* Subheadline */}
           <p
             className={cn(
-              "text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-11 text-pretty transition-all duration-700 delay-200",
+              "text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10 text-pretty transition-all duration-700 delay-200",
               mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             )}
           >
@@ -136,72 +158,7 @@ export function HeroSection() {
             now across the Hacker News community.
           </p>
 
-          {/* CTA Buttons */}
-          <div
-            className={cn(
-              "flex flex-col sm:flex-row items-center justify-center gap-4 mb-14 transition-all duration-700 delay-300",
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            )}
-          >
-            <Link href="/search">
-              <Button
-                size="lg"
-                className={cn(
-                  "cursor-pointer h-14 px-8 bg-foreground text-background font-semibold rounded-2xl text-base",
-                  "shadow-elevation-2 hover:shadow-elevation-3",
-                  "transition-all duration-300 btn-press shimmer-hover group"
-                )}
-              >
-                <span className="flex items-center gap-2.5">
-                  Start Searching Free
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </span>
-              </Button>
-            </Link>
-            <a
-              href="#how-it-works"
-              className={cn(
-                "inline-flex items-center gap-3 h-14 px-5 rounded-2xl",
-                "text-muted-foreground hover:text-foreground",
-                "font-medium transition-all duration-300 group",
-                "hover:bg-secondary/60 focus-ring"
-              )}
-            >
-              <span className={cn(
-                "w-11 h-11 rounded-xl border-2 border-border/80 flex items-center justify-center",
-                "group-hover:border-foreground group-hover:bg-foreground group-hover:text-background",
-                "transition-all duration-300"
-              )}>
-                <Play className="w-4 h-4 ml-0.5" />
-              </span>
-              <span>See how it works</span>
-            </a>
-          </div>
-
-          {/* Trust features */}
-          <div
-            className={cn(
-              "transition-all duration-700 delay-400",
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            )}
-          >
-            <div className="inline-flex flex-col sm:flex-row items-center gap-6 lg:gap-8 py-5 px-7 rounded-2xl bg-secondary/50 border border-border/40">
-              {trustFeatures.map((feature, index) => {
-                const Icon = feature.icon
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-card flex items-center justify-center shadow-xs border border-border/40">
-                      <Icon className="w-4 h-4 text-primary" />
-                    </div>
-                    <span className="text-sm text-muted-foreground font-medium">{feature.text}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          
         </div>
       </div>
     </section>
