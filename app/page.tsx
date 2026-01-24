@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { HomeContent } from "@/components/home-content";
+import { SITE_CONFIG } from "@/constants/branding";
 
 interface HomePageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -17,40 +18,18 @@ export async function generateMetadata({
   const query = typeof params.q === "string" ? params.q : undefined;
   const searchId = typeof params.searchId === "string" ? params.searchId : undefined;
 
-  // Default metadata for landing page
+  // Default metadata for landing page (inherits from layout)
   if (!query) {
     return {
-      title: "Reminer — Mine Real Pain Points from Hacker News",
-      description:
-        "Discover validated product ideas, customer complaints, and market opportunities by analyzing authentic Hacker News discussions. AI-powered user research in seconds.",
-      openGraph: {
-        title: "Reminer — Mine Real Pain Points from Hacker News",
-        description:
-          "Discover validated product ideas, customer complaints, and market opportunities by analyzing authentic Hacker News discussions.",
-        type: "website",
-        siteName: "Reminer",
-        images: [
-          {
-            url: "/api/og",
-            width: 1200,
-            height: 630,
-            alt: "Reminer - Mine Pain Points from Hacker News",
-          },
-        ],
-      },
-      twitter: {
-        card: "summary_large_image",
-        title: "Reminer — Mine Real Pain Points from Hacker News",
-        description:
-          "Discover validated product ideas, customer complaints, and market opportunities by analyzing authentic Hacker News discussions.",
-        images: ["/api/og"],
+      alternates: {
+        canonical: "/",
       },
     };
   }
 
   // Dynamic metadata for search results
-  const title = `${query} Pain Points — Reminer`;
-  const description = `Discover real user pain points about "${query}" from Hacker News discussions. AI-powered user research.`;
+  const title = `${query} Startup Ideas — ${SITE_CONFIG.name}`;
+  const description = `Find startup ideas related to "${query}" by analyzing real user pain points from Hacker News discussions. Discover validated business opportunities.`;
 
   // Build OG image URL
   const ogParams = new URLSearchParams();
@@ -61,17 +40,20 @@ export async function generateMetadata({
   return {
     title,
     description,
+    alternates: {
+      canonical: `/?q=${encodeURIComponent(query)}`,
+    },
     openGraph: {
       title,
       description,
       type: "website",
-      siteName: "Reminer",
+      siteName: SITE_CONFIG.name,
       images: [
         {
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: `Pain points for ${query}`,
+          alt: `Startup ideas for ${query}`,
         },
       ],
     },
