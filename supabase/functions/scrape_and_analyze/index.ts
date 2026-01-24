@@ -45,6 +45,7 @@ import { callGeminiForAnalysis } from "./gemini/client.ts";
 // Database
 import {
   updateSearchStatus,
+  markSearchForRetry,
   getSearch,
   getExistingResults,
   insertSearchResults,
@@ -647,22 +648,25 @@ serve(async (req) => {
       ? "AI analysis failed. Please try again."
       : "Something went wrong. Please try again later.";
 
-    await updateSearchStatus(
+    // Use retry logic instead of immediately marking as failed
+    // This allows transient failures to be retried automatically
+    await markSearchForRetry(
       supabase,
       searchId!,
-      "failed",
       userFriendlyMessage
     );
+    
     await logJob(supabase, searchId!, "error", "scrape_and_analyze job failed", {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
+      willRetry: true,
     });
 
     clearTimeout(timeout);
 
     return new Response(
       JSON.stringify({
-        status: "failed",
+        status: "retry_scheduled",
         error: userFriendlyMessage,
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }

@@ -43,6 +43,81 @@ export async function updateSearchStatus(
 }
 
 /**
+ * Mark a search for retry with exponential backoff
+ * Used when edge function fails but retries are still available
+ * 
+ * Backoff schedule:
+ * - Retry 1: 1 minute delay
+ * - Retry 2: 2 minutes delay
+ * - Retry 3: 4 minutes delay (max retries reached after this)
+ * 
+ * @param supabase - Supabase client
+ * @param searchId - UUID of the search
+ * @param errorMessage - Error message to store
+ */
+export async function markSearchForRetry(
+  supabase: SupabaseClient,
+  searchId: string,
+  errorMessage: string
+): Promise<void> {
+  try {
+    // Get current retry count
+    const { data: search, error: fetchError } = await supabase
+      .from("searches")
+      .select("retry_count")
+      .eq("id", searchId)
+      .single();
+
+    if (fetchError) {
+      console.error("[markSearchForRetry] Failed to fetch search:", fetchError);
+      // Fall back to marking as failed
+      await updateSearchStatus(supabase, searchId, "failed", errorMessage);
+      return;
+    }
+
+    const currentRetryCount = search?.retry_count ?? 0;
+    const newRetryCount = currentRetryCount + 1;
+    const maxRetries = 3;
+
+    if (newRetryCount >= maxRetries) {
+      // Max retries reached, mark as permanently failed
+      console.log(`[markSearchForRetry] Max retries (${maxRetries}) reached for ${searchId}, marking as failed`);
+      await updateSearchStatus(supabase, searchId, "failed", errorMessage);
+      return;
+    }
+
+    // Calculate exponential backoff: 2^(retryCount-1) minutes
+    // Retry 1: 1 min, Retry 2: 2 min, Retry 3: 4 min
+    const backoffMinutes = Math.pow(2, newRetryCount - 1);
+    const nextRetryAt = new Date(Date.now() + backoffMinutes * 60 * 1000);
+
+    console.log(
+      `[markSearchForRetry] Scheduling retry ${newRetryCount}/${maxRetries} for ${searchId} at ${nextRetryAt.toISOString()}`
+    );
+
+    const { error: updateError } = await supabase
+      .from("searches")
+      .update({
+        status: "pending",
+        retry_count: newRetryCount,
+        next_retry_at: nextRetryAt.toISOString(),
+        error_message: errorMessage,
+      })
+      .eq("id", searchId);
+
+    if (updateError) {
+      console.error("[markSearchForRetry] Failed to update search for retry:", updateError);
+      // Fall back to marking as failed
+      await updateSearchStatus(supabase, searchId, "failed", errorMessage);
+    }
+  } catch (err) {
+    console.error("[markSearchForRetry] Unexpected error:", err);
+    // Fall back to marking as failed
+    await updateSearchStatus(supabase, searchId, "failed", errorMessage);
+  }
+}
+
+/**
  * Get search by ID
  */
 export async function getSearch(

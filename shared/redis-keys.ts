@@ -29,9 +29,19 @@ export function redisKeySearchMap(searchKey: string): string {
 }
 
 /**
- * Key prefix for IP-based rate limiting
+ * Key prefix for global rate limiting (all users combined)
+ */
+export const RATE_LIMIT_GLOBAL_PREFIX = "rate:global";
+
+/**
+ * Key prefix for IP-based rate limiting (per minute)
  */
 export const RATE_LIMIT_IP_PREFIX = "rate:ip";
+
+/**
+ * Key prefix for IP-based daily rate limiting
+ */
+export const RATE_LIMIT_IP_DAILY_PREFIX = "rate:ip:daily";
 
 /**
  * Key prefix for topic-based rate limiting

@@ -68,12 +68,13 @@ export async function POST(request: NextRequest) {
         return successResponse(cachedById, rateLimitHeaders);
       }
 
-      // If still processing, trigger edge function again (idempotent)
+      // If still processing or pending, trigger edge function again (idempotent) and return status
       if (
         existingSearch.status === "processing" ||
         existingSearch.status === "pending"
       ) {
-        await triggerEdgeFunction(existingSearch.id);
+        // Re-trigger edge function in case it failed or is stuck
+        triggerEdgeFunction(existingSearch.id);
         return searchProcessingResponse(
           existingSearch.id,
           existingSearch.status as "pending" | "processing",
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
         time_range: parsed.timeRange,
         min_upvotes: parsed.minUpvotes,
         sort_by: parsed.sortBy,
-        status: "processing",
+        status: "pending", // Queue-based: pg_cron will pick this up and trigger edge function
       })
       .select("id, status")
       .single();
@@ -118,16 +119,19 @@ export async function POST(request: NextRequest) {
       console.error("[POST /api/search] Failed to set searchKey mapping:", err);
     });
 
-    // 5) Trigger edge function
+    // Trigger edge function immediately for responsiveness
+    // pg_cron serves as a backup to pick up any searches that fail or get stuck
     const triggered = await triggerEdgeFunction(data.id);
-    if (!triggered) {
-      console.warn(
-        `[POST /api/search] Edge function trigger failed for ${data.id}`
-      );
-      // Don't fail the request - edge function might still pick it up via pg_cron
+    if (triggered) {
+      // Update status to processing since we triggered it
+      await supabase
+        .from("searches")
+        .update({ status: "processing" })
+        .eq("id", data.id);
     }
+    // If trigger fails, pg_cron will pick it up within 1 minute (status remains "pending")
 
-    // 6) Short-poll for results (up to 8 seconds)
+    // 5) Short-poll for results (up to 8 seconds)
     const pollResult = await shortPollForResults(data.id, supabase);
 
     if (pollResult && pollResult.status === "completed") {
@@ -135,6 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Return processing status if not ready yet
+    // Client will poll /api/search-status until complete
     return searchProcessingResponse(
       data.id,
       (pollResult?.status as "pending" | "processing") || "processing",
