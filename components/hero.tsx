@@ -104,7 +104,7 @@ export function HeroSection() {
               </span>
             </span>
             <span className="text-sm font-medium text-foreground/90">
-              AI-Powered Market Research
+              AI-Powered Startup Idea Discovery
             </span>
             <span className="flex items-center gap-1.5 pl-2 border-l border-border/50">
               <span className="relative flex h-2 w-2">
@@ -122,9 +122,9 @@ export function HeroSection() {
               mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             )}
           >
-            <span className="block">Mine real pain points</span>
+            <span className="block">Find Startup Ideas</span>
             <span className="relative inline-block mt-1">
-              <span className="relative z-10 text-primary">from Hacker News</span>
+              <span className="relative z-10 text-primary">from Real Pain Points</span>
               <svg 
                 className="absolute -bottom-1 left-0 w-full h-3 text-primary/25 overflow-visible"
                 viewBox="0 0 200 12" 
@@ -153,9 +153,9 @@ export function HeroSection() {
               mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             )}
           >
-            Discover validated product ideas, customer complaints, and market
-            opportunities by analyzing authentic conversations happening right
-            now across the Hacker News community.
+            Discover validated startup ideas by analyzing authentic pain points
+            from Hacker News discussions. AI-powered startup idea discovery in
+            seconds.
           </p>
 
           

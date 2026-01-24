@@ -4,6 +4,13 @@ import { getSupabaseServiceClient } from "@/lib/supabase-server";
 
 export const runtime = "edge";
 
+// Brand configuration for OG images
+const BRAND = {
+  name: "Find Startup Ideas",
+  domain: "findstartupideas.com",
+  tagline: "AI-powered startup idea discovery",
+} as const;
+
 // OG Image dimensions (Twitter/Facebook standard)
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -78,7 +85,7 @@ function sanitize(text: string, maxLength = 100): string {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const topic = sanitize(searchParams.get("q") || "Pain Points", 50);
+  const topic = sanitize(searchParams.get("q") || "Startup Ideas", 50);
   const searchId = searchParams.get("searchId");
 
   // Try to fetch real data
@@ -185,13 +192,13 @@ export async function GET(request: NextRequest) {
               </div>
               <span
                 style={{
-                  fontSize: 32,
+                  fontSize: 28,
                   fontWeight: 500,
                   color: "#1a1a18",
                   fontFamily: "Georgia, serif",
                 }}
               >
-                Reminer
+                {BRAND.name}
               </span>
             </div>
 
@@ -240,7 +247,7 @@ export async function GET(request: NextRequest) {
                 letterSpacing: "0.1em",
               }}
             >
-              Pain Points for
+              Startup Ideas for
             </span>
             <h1
               style={{
@@ -303,7 +310,7 @@ export async function GET(request: NextRequest) {
                     color: "#6b21a8",
                   }}
                 >
-                  {painPointCount} Pain Points Identified
+                  {painPointCount} Startup Ideas Found
                 </span>
               </div>
 
@@ -386,7 +393,7 @@ export async function GET(request: NextRequest) {
                   maxWidth: 700,
                 }}
               >
-                Discover real user pain points, complaints, and product opportunities from authentic Hacker News discussions.
+                Find validated startup ideas by analyzing real user pain points from authentic Hacker News discussions.
               </p>
             </div>
           )}
@@ -409,7 +416,7 @@ export async function GET(request: NextRequest) {
               color: "#666",
             }}
           >
-            reminer.vercel.app
+            {BRAND.domain}
           </span>
           <span
             style={{
@@ -417,7 +424,7 @@ export async function GET(request: NextRequest) {
               color: "#888",
             }}
           >
-            AI-powered user research in seconds
+            {BRAND.tagline}
           </span>
         </div>
       </div>

@@ -75,7 +75,7 @@ export function TestimonialsSection() {
             <span className="text-muted-foreground">real opportunities</span>
           </h2>
           <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-            See what others have found using Reminer to validate ideas and discover market gaps.
+            See what others have found using Find Startup Ideas to validate ideas and discover market gaps.
           </p>
         </div>
 

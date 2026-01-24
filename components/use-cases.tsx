@@ -53,7 +53,7 @@ export function UseCasesSection() {
             Built for builders
           </h2>
           <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-            Whether you're validating a startup idea or researching competitors, Reminer gives you the insights you need.
+            Whether you're looking for startup ideas or researching competitors, we give you the insights you need.
           </p>
         </div>
 

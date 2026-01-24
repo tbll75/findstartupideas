@@ -165,7 +165,7 @@ export function generateFilename(topic: string, type: "full" | "single" = "full"
     .slice(0, 30);
   
   const timestamp = Date.now();
-  return `reminer-${sanitized}-${type}-${timestamp}`;
+  return `startup-ideas-${sanitized}-${type}-${timestamp}`;
 }
 
 /**
@@ -187,13 +187,13 @@ export function generateTweetText(
   painPointCount: number,
   topPainPoint?: string
 ): string {
-  let text = `🔍 Found ${painPointCount} pain points about "${topic}" from Hacker News discussions`;
+  let text = `🔍 Found ${painPointCount} startup ideas about "${topic}" from Hacker News discussions`;
   
   if (topPainPoint) {
-    text += `\n\nTop issue: "${topPainPoint}"`;
+    text += `\n\nTop opportunity: "${topPainPoint}"`;
   }
   
-  text += "\n\nDiscover more with @ReminerApp 👇";
+  text += "\n\nDiscover more at findstartupideas.com";
   
   return text;
 }
@@ -206,5 +206,5 @@ export function generateSinglePainPointTweet(
   painPointTitle: string,
   mentions: number
 ): string {
-  return `💡 "${painPointTitle}"\n\n${mentions} people mentioned this pain point about ${topic} on Hacker News.\n\nFound with @ReminerApp 👇`;
+  return `💡 "${painPointTitle}"\n\n${mentions} people mentioned this pain point about ${topic} on Hacker News.\n\nFound at findstartupideas.com`;
 }

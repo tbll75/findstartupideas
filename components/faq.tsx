@@ -52,7 +52,7 @@ export function FAQSection() {
             Questions & Answers
           </h2>
           <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-            Everything you need to know about Reminer and how it can help your research.
+            Everything you need to know about finding startup ideas and how we can help your research.
           </p>
         </div>
 

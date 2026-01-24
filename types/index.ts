@@ -1,5 +1,5 @@
 /**
- * Central type exports for Reminer
+ * Central type exports for Find Startup Ideas
  *
  * Usage:
  * import type { SearchResult, PainPoint, HNStory } from "@/types";

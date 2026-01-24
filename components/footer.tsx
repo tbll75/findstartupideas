@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { footerLinks, socialLinks } from "@/constants"
+import { SITE_CONFIG } from "@/constants/branding"
 
 export function Footer() {
   const [email, setEmail] = useState("")
@@ -20,12 +21,12 @@ export function Footer() {
           <div className="col-span-3">
             <Link href="/" className="inline-flex items-center gap-2.5 mb-5 group focus-ring rounded-lg">
               <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center transition-shadow duration-300 group-hover:shadow-elevation-1">
-                <span className="text-background font-serif text-lg font-semibold">R</span>
+                <span className="text-background font-serif text-lg font-semibold">F</span>
               </div>
-              <span className="font-serif text-xl font-medium text-foreground tracking-tight">Reminer</span>
+              <span className="font-serif text-xl font-medium text-foreground tracking-tight">{SITE_CONFIG.name}</span>
             </Link>
             <p className="text-muted-foreground leading-relaxed max-w-sm mb-7 text-[15px]">
-              Discover real user pain points from HackerNews discussions. Turn authentic conversations into validated product opportunities.
+              {SITE_CONFIG.footerDescription}
             </p>
             
           </div>
@@ -69,7 +70,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="py-7 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-5">
           <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-5 text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Reminer. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} {SITE_CONFIG.name}. All rights reserved.</p>
             <span className="hidden sm:block w-1 h-1 rounded-full bg-border" />
           </div>
           <div className="flex items-center gap-2">

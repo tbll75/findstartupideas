@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { navLinks } from "@/constants"
+import { SITE_CONFIG } from "@/constants/branding"
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -58,11 +59,14 @@ export function Header() {
                 "w-9 h-9 rounded-xl bg-foreground flex items-center justify-center transition-all duration-300",
                 "group-hover:scale-105 group-hover:shadow-elevation-2"
               )}>
-                <span className="text-background font-serif text-lg font-semibold">R</span>
+                <span className="text-background font-serif text-lg font-semibold">F</span>
               </div>
             </div>
-            <span className="font-serif text-xl font-medium text-foreground tracking-tight">
-              Reminer
+            <span className="font-serif text-lg font-medium text-foreground tracking-tight hidden sm:inline">
+              {SITE_CONFIG.name}
+            </span>
+            <span className="font-serif text-lg font-medium text-foreground tracking-tight sm:hidden">
+              {SITE_CONFIG.shortName}
             </span>
           </Link>
 

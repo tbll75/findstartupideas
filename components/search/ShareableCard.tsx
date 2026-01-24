@@ -94,7 +94,7 @@ const FullResultsCard = forwardRef<HTMLDivElement, ShareableCardFullProps>(
                 marginBottom: 2,
               }}
             >
-              Pain Points for
+              Startup Ideas for
             </div>
             <div
               style={{
@@ -194,7 +194,7 @@ const FullResultsCard = forwardRef<HTMLDivElement, ShareableCardFullProps>(
             <TrendingUp style={{ width: 14, height: 14, color: "white" }} />
           </div>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#6b21a8" }}>
-            {painPoints.length} Pain Points Identified
+            {painPoints.length} Startup Ideas Found
           </span>
         </div>
 
@@ -271,10 +271,10 @@ const FullResultsCard = forwardRef<HTMLDivElement, ShareableCardFullProps>(
           }}
         >
           <span style={{ fontSize: 13, color: "#888", fontWeight: 500 }}>
-            reminer.vercel.app
+            findstartupideas.com
           </span>
           <span style={{ fontSize: 11, color: "#aaa" }}>
-            AI-powered pain point discovery
+            AI-powered startup idea discovery
           </span>
         </div>
       </div>
@@ -503,10 +503,10 @@ const SinglePainPointCard = forwardRef<HTMLDivElement, ShareableCardSingleProps>
           }}
         >
           <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>
-            reminer.vercel.app
+            findstartupideas.com
           </span>
           <span style={{ fontSize: 10, color: "#aaa" }}>
-            AI-powered pain point discovery
+            AI-powered startup idea discovery
           </span>
         </div>
       </div>

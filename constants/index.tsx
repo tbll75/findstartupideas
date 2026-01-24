@@ -37,15 +37,15 @@ export const steps = [
     number: "02",
     icon: Cpu,
     title: "AI Analyzes Discussions",
-    description: "Our AI reads thousands of HackerNews threads to extract genuine pain points from real conversations.",
+    description: "Our AI reads thousands of HackerNews threads to extract genuine pain points and startup opportunities from real conversations.",
     gradient: "from-blue-500 to-cyan-400",
     iconBg: "bg-gradient-to-br from-blue-500 to-cyan-500",
   },
   {
     number: "03",
     icon: Lightbulb,
-    title: "Get Actionable Insights",
-    description: "Receive prioritized pain points backed by real quotes, engagement metrics, and market signals.",
+    title: "Get Startup Ideas",
+    description: "Receive validated startup ideas backed by real user pain points, quotes, and market signals.",
     gradient: "from-emerald-500 to-teal-400",
     iconBg: "bg-gradient-to-br from-emerald-500 to-teal-500",
   },
@@ -53,9 +53,9 @@ export const steps = [
 
 export const benefits = [
   "Save 100+ hours of manual research",
-  "Find validated product ideas from real users",
+  "Find validated startup ideas from real users",
   "Discover untapped market opportunities",
-  "Build products people actually want",
+  "Build startups people actually need",
 ]
 
 
@@ -63,11 +63,11 @@ export const useCases = [
   {
     icon: Rocket,
     title: "Founders & Indie Hackers",
-    subtitle: "Validate ideas",
-    description: "Discover what users hate about your competitors. Find pain points to build your startup around.",
+    subtitle: "Find startup ideas",
+    description: "Discover what users hate about existing products. Find validated startup ideas backed by real pain points.",
     example: {
       search: "Shopify",
-      insight: "Find merchant frustrations to build a better alternative",
+      insight: "Find merchant frustrations to build your next startup",
     },
     gradient: "from-orange-500 to-amber-500",
     bgGradient: "from-orange-500/8 to-amber-500/4",
@@ -78,7 +78,7 @@ export const useCases = [
     icon: BarChart3,
     title: "Product Managers",
     subtitle: "Data-driven roadmaps",
-    description: "Validate feature ideas with real user feedback. Understand what's missing in existing tools.",
+    description: "Validate feature ideas with real user feedback. Find startup opportunities in existing tool gaps.",
     example: {
       search: "project management",
       insight: "Discover gaps in tools like Asana, Monday, Notion",
@@ -92,7 +92,7 @@ export const useCases = [
     icon: Megaphone,
     title: "Marketers",
     subtitle: "Content that resonates",
-    description: "Find content angles that connect. Discover the exact problems your audience is discussing.",
+    description: "Find content angles that connect. Discover startup ideas your audience is actively seeking.",
     example: {
       search: "email marketing",
       insight: "Uncover pain points for viral blog content",
@@ -106,7 +106,7 @@ export const useCases = [
     icon: Code2,
     title: "Developers",
     subtitle: "Build tools devs need",
-    description: "Find gaps in developer tooling. Build solutions for problems developers are actively discussing.",
+    description: "Find gaps in developer tooling. Discover startup ideas for problems developers are actively discussing.",
     example: {
       search: "Next.js",
       insight: "Find frustrations in the ecosystem to solve",
@@ -121,12 +121,12 @@ export const useCases = [
 export const testimonials = [
   {
     icon: Lightbulb,
-    highlight: "I found 5 product ideas in 10 minutes",
+    highlight: "I found 5 startup ideas in 10 minutes",
     author: "Sarah K.",
     role: "Indie Hacker",
-    description: "Searched 'freelance' and discovered pain points about invoicing, client communication, and time tracking that nobody else is solving well.",
+    description: "Searched 'freelance' and discovered startup ideas around invoicing, client communication, and time tracking that nobody else is solving well.",
     searchTerm: "freelance",
-    discoveries: ["Invoicing pain points", "Client communication gaps", "Time tracking frustrations"],
+    discoveries: ["Invoicing startup idea", "Client communication gaps", "Time tracking opportunities"],
     gradient: "from-orange-500 to-amber-500",
     bgGlow: "oklch(0.70 0.18 40 / 0.15)",
   },
@@ -143,10 +143,10 @@ export const testimonials = [
   },
   {
     icon: TrendingUp,
-    highlight: "Discovered an underserved market",
+    highlight: "Discovered an underserved startup opportunity",
     author: "Emily R.",
     role: "Product Manager",
-    description: "Searched 'no-code tools' and found a massive gap in automation capabilities. This shaped our entire product roadmap.",
+    description: "Searched 'no-code tools' and found a massive gap in automation capabilities. This shaped our entire product roadmap and startup direction.",
     searchTerm: "no-code tools",
     discoveries: ["Automation limitations", "Non-technical user needs", "Integration gaps"],
     gradient: "from-emerald-500 to-teal-500",
@@ -157,28 +157,28 @@ export const testimonials = [
 
 export const faqs = [
   {
-    question: "What sources does Reminer search?",
-    answer: "Currently HackerNews discussions. We analyze thousands of posts and comments from developers, founders, and tech professionals sharing real product experiences. This gives you access to authentic, unfiltered feedback from people who actually use these products daily.",
+    question: "What sources does Find Startup Ideas search?",
+    answer: "Currently HackerNews discussions. We analyze thousands of posts and comments from developers, founders, and tech professionals sharing real product experiences. This gives you access to authentic, unfiltered feedback from people who actually use these products daily — perfect for finding validated startup ideas.",
   },
   {
     question: "How is this different from manual research?",
-    answer: "Manual research takes 10+ hours to read through hundreds of comments. Reminer's AI analyzes everything in 30 seconds and extracts only the actionable insights. You get the same quality of research in a fraction of the time, allowing you to move faster from idea to validation.",
+    answer: "Manual research takes 10+ hours to read through hundreds of comments. Our AI analyzes everything in 30 seconds and extracts only the actionable startup ideas and pain points. You get the same quality of research in a fraction of the time, allowing you to move faster from idea to validation.",
   },
   {
-    question: "Can I trust the AI-generated insights?",
-    answer: "Absolutely. Every pain point includes direct quotes from real HackerNews users with links to the original discussions. You see the actual evidence, not just AI summaries. This transparency lets you verify any insight and dig deeper when needed.",
+    question: "Can I trust the AI-generated startup ideas?",
+    answer: "Absolutely. Every startup idea and pain point includes direct quotes from real HackerNews users with links to the original discussions. You see the actual evidence, not just AI summaries. This transparency lets you verify any insight and dig deeper when needed.",
   },
   {
-    question: "What kind of topics can I search?",
-    answer: "Any product, tool, market, or technology discussed on HackerNews: SaaS products (Shopify, Notion), programming tools (Next.js, React), markets (freelancing, remote work), or industries (fintech, edtech). If people are talking about it on HackerNews, you can search for it.",
+    question: "What kind of topics can I search for startup ideas?",
+    answer: "Any product, tool, market, or technology discussed on HackerNews: SaaS products (Shopify, Notion), programming tools (Next.js, React), markets (freelancing, remote work), or industries (fintech, edtech). If people are talking about it on HackerNews, you can find startup ideas around it.",
   },
   {
-    question: "How often is the data updated?",
-    answer: "We search live HackerNews discussions. Results include posts from the past week, month, or year depending on your filter settings. This means you always get fresh insights from recent conversations.",
+    question: "How often is the startup idea data updated?",
+    answer: "We search live HackerNews discussions. Results include posts from the past week, month, or year depending on your filter settings. This means you always get fresh startup ideas from recent conversations.",
   },
   {
     question: "Is there a limit on searches?",
-    answer: "Free users get 5 searches per day, which is enough to explore a few ideas. Paid plans offer unlimited searches and advanced filters for power users who need to do extensive market research.",
+    answer: "Free users get 5 searches per day, which is enough to explore a few startup ideas. Paid plans offer unlimited searches and advanced filters for power users who need to do extensive market research.",
   },
 ]
 

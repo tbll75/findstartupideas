@@ -213,7 +213,7 @@ export function HowItWorksSection() {
             
             <div className="relative z-10">
               <h3 className="text-center font-semibold text-muted-foreground uppercase tracking-wider mb-8">
-                What you get with Reminer
+                What you get with Find Startup Ideas
               </h3>
               <div className="grid justify-center">
                 {benefits.map((benefit, index) => (
