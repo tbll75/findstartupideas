@@ -99,9 +99,6 @@ export const CLIENT_MAX_POLL_ATTEMPTS = 30;
 /** Edge function timeout (ms) */
 export const EDGE_FUNCTION_TIMEOUT_MS = 60_000;
 
-/** Edge function trigger timeout (ms) */
-export const EDGE_FUNCTION_TRIGGER_TIMEOUT_MS = 2000;
-
 // ============================================================================
 // Validation
 // ============================================================================
