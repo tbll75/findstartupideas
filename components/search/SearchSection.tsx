@@ -88,10 +88,9 @@ export function SearchSection() {
       return;
     }
 
-    // Increment count before syncing to URL (URL effect will trigger the actual search)
-    incrementSearchCount();
+    // syncToUrl will change URL, which triggers the URL effect that increments count
     syncToUrl();
-  }, [query, syncToUrl, canSearch, openGate, incrementSearchCount]);
+  }, [query, syncToUrl, canSearch, openGate]);
 
   /**
    * Handle search with a specific term (for badge clicks)
@@ -118,7 +117,9 @@ export function SearchSection() {
       }
 
       setQuery(searchTerm);
-      // Update URL - the URL effect will trigger the search
+      // Update URL and execute search
+      // Note: pushState doesn't trigger the URL effect, so we call performSearch directly
+      // The URL effect won't double-fire because pushState doesn't trigger popstate
       const params = new URLSearchParams();
       params.set("q", searchTerm);
       if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
@@ -126,10 +127,9 @@ export function SearchSection() {
       if (minUpvotes !== "10") params.set("upvotes", minUpvotes);
       if (sortBy !== "relevance") params.set("sort", sortBy);
 
-      // Increment count before updating URL (URL effect will trigger the actual search)
+      // Increment count here since pushState doesn't trigger URL effect
       incrementSearchCount();
       window.history.pushState({}, "", `?${params.toString()}`);
-      // Manually trigger since pushState doesn't trigger URL change effect
       performSearch(searchParams);
     },
     [
