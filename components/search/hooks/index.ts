@@ -14,3 +14,10 @@ export {
   type SearchFilters,
   type SearchParamsActions,
 } from "./useSearchParams";
+
+export {
+  useSearchGate,
+  type SearchGateState,
+  type SearchGateActions,
+  SEARCH_GATE_CONFIG,
+} from "./useSearchGate";

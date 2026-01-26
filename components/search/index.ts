@@ -15,9 +15,10 @@ export { QuoteItem } from "./QuoteItem";
 export { ShareToolbar } from "./ShareToolbar";
 export { ShareModal } from "./ShareModal";
 export { ShareableCard } from "./ShareableCard";
+export { EmailGateModal } from "./EmailGateModal";
 
 // Hooks
-export { useSearch, useSearchFilters } from "./hooks";
+export { useSearch, useSearchFilters, useSearchGate } from "./hooks";
 
 // Utils
 export {

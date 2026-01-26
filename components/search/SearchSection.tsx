@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, useMemo } from "react";
-import { useSearch, useSearchFilters } from "./hooks";
+import { useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearch, useSearchFilters, useSearchGate } from "./hooks";
 import { SearchProgress } from "./SearchProgress";
 import { SearchInput } from "./SearchInput";
 import { SearchFilters } from "./SearchFilters";
@@ -11,6 +11,7 @@ import { LiveStoriesFeed } from "./LiveStoriesFeed";
 import { LiveCommentsFeed } from "./LiveCommentsFeed";
 import { LivePainPointsFeed } from "./LivePainPointsFeed";
 import { ExampleSearchBadges } from "./ExampleSearchBadges";
+import { EmailGateModal } from "./EmailGateModal";
 
 /**
  * Main search section component
@@ -48,37 +49,154 @@ export function SearchSection() {
     urlSearchParams,
   } = useSearchFilters();
 
+  const {
+    isSubscribed,
+    hasReachedLimit,
+    shouldShowGate,
+    incrementSearchCount,
+    markAsSubscribed,
+    canSearch,
+    openGate,
+    closeGate,
+  } = useSearchGate();
+
+  // Track pending search params when gate is shown
+  const pendingSearchRef = useRef<{
+    type: "url" | "manual" | "badge";
+    params?: {
+      topic: string;
+      tags: string[];
+      timeRange: string;
+      minUpvotes: number;
+      sortBy: string;
+    };
+  } | null>(null);
+
+  /**
+   * Execute a search with gate check
+   */
+  const executeSearch = useCallback(
+    (params: {
+      topic: string;
+      tags: string[];
+      timeRange: string;
+      minUpvotes: number;
+      sortBy: string;
+    }) => {
+      // Check if user can search
+      if (!canSearch()) {
+        // Store pending search and show gate
+        pendingSearchRef.current = { type: "manual", params };
+        openGate();
+        return;
+      }
+
+      // Increment search count and perform search
+      incrementSearchCount();
+      performSearch(params);
+    },
+    [canSearch, incrementSearchCount, performSearch, openGate]
+  );
+
   /**
    * Handle search trigger
    */
   const handleSearch = useCallback(() => {
     if (query.length < 2) return;
+
+    // Check if user can search
+    if (!canSearch()) {
+      pendingSearchRef.current = { type: "manual" };
+      openGate();
+      return;
+    }
+
     syncToUrl();
-  }, [query, syncToUrl]);
+  }, [query, syncToUrl, canSearch, openGate]);
 
   /**
    * Handle search with a specific term (for badge clicks)
    */
-  const handleSearchWithTerm = useCallback((searchTerm: string) => {
-    if (searchTerm.length < 2) return;
-    setQuery(searchTerm);
-    // Update URL and trigger search
-    const params = new URLSearchParams();
-    params.set("q", searchTerm);
-    if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
-    if (timeRange !== "month") params.set("time", timeRange);
-    if (minUpvotes !== 10) params.set("upvotes", minUpvotes.toString());
-    if (sortBy !== "relevance") params.set("sort", sortBy);
-    
-    window.history.pushState({}, "", `?${params.toString()}`);
-    performSearch({
-      topic: searchTerm,
-      tags: selectedTags,
+  const handleSearchWithTerm = useCallback(
+    (searchTerm: string) => {
+      if (searchTerm.length < 2) return;
+
+      const minUpvotesNum = Number(minUpvotes);
+      const searchParams = {
+        topic: searchTerm,
+        tags: selectedTags,
+        timeRange,
+        minUpvotes: minUpvotesNum,
+        sortBy,
+      };
+
+      // Check if user can search
+      if (!canSearch()) {
+        pendingSearchRef.current = { type: "badge", params: searchParams };
+        openGate();
+        return;
+      }
+
+      setQuery(searchTerm);
+      // Update URL and trigger search
+      const params = new URLSearchParams();
+      params.set("q", searchTerm);
+      if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
+      if (timeRange !== "month") params.set("time", timeRange);
+      if (minUpvotes !== "10") params.set("upvotes", minUpvotes);
+      if (sortBy !== "relevance") params.set("sort", sortBy);
+
+      window.history.pushState({}, "", `?${params.toString()}`);
+      incrementSearchCount();
+      performSearch(searchParams);
+    },
+    [
+      setQuery,
+      selectedTags,
       timeRange,
       minUpvotes,
       sortBy,
-    });
-  }, [setQuery, selectedTags, timeRange, minUpvotes, sortBy, performSearch]);
+      performSearch,
+      canSearch,
+      openGate,
+      incrementSearchCount,
+    ]
+  );
+
+  /**
+   * Handle successful email subscription
+   */
+  const handleGateSuccess = useCallback(() => {
+    markAsSubscribed();
+
+    // Execute pending search if any
+    const pending = pendingSearchRef.current;
+    if (pending) {
+      pendingSearchRef.current = null;
+
+      if (pending.type === "manual" && !pending.params) {
+        // Manual search - sync to URL
+        syncToUrl();
+      } else if (pending.params) {
+        // Badge or manual with params - execute directly
+        if (pending.type === "badge") {
+          setQuery(pending.params.topic);
+          const params = new URLSearchParams();
+          params.set("q", pending.params.topic);
+          if (pending.params.tags.length > 0)
+            params.set("tags", pending.params.tags.join(","));
+          if (pending.params.timeRange !== "month")
+            params.set("time", pending.params.timeRange);
+          if (pending.params.minUpvotes !== 10)
+            params.set("upvotes", pending.params.minUpvotes.toString());
+          if (pending.params.sortBy !== "relevance")
+            params.set("sort", pending.params.sortBy);
+          window.history.pushState({}, "", `?${params.toString()}`);
+        }
+        performSearch(pending.params);
+      }
+    }
+  }, [markAsSubscribed, syncToUrl, performSearch, setQuery]);
 
   /**
    * Perform search when URL parameters change
@@ -96,15 +214,25 @@ export function SearchSection() {
       return;
     }
 
-    // Perform search with URL parameters
-    performSearch({
+    const searchParams = {
       topic: urlQuery,
       tags: urlTags ? urlTags.split(",").filter(Boolean) : [],
       timeRange: urlTime || "month",
       minUpvotes: Number(urlUpvotes || "10"),
       sortBy: urlSort || "relevance",
-    });
-  }, [urlSearchParams, performSearch, resetSearch]);
+    };
+
+    // Check if user can search
+    if (!canSearch()) {
+      pendingSearchRef.current = { type: "url", params: searchParams };
+      openGate();
+      return;
+    }
+
+    // Perform search with URL parameters
+    incrementSearchCount();
+    performSearch(searchParams);
+  }, [urlSearchParams, performSearch, resetSearch, canSearch, openGate, incrementSearchCount]);
 
   // Check if we have any live data to show
   const hasLiveData = useMemo(() => {
@@ -206,6 +334,14 @@ export function SearchSection() {
           </>
         )}
       </div>
+
+      {/* Email Gate Modal */}
+      <EmailGateModal
+        open={shouldShowGate}
+        onOpenChange={closeGate}
+        onSuccess={handleGateSuccess}
+        hasReachedLimit={hasReachedLimit}
+      />
     </section>
   );
 }
