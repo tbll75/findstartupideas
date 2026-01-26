@@ -21,7 +21,6 @@ export function SearchSection() {
   const {
     isLoading,
     isPolling,
-    searchResults,
     errorMessage,
     loadingProgress,
     phase,
@@ -50,9 +49,9 @@ export function SearchSection() {
   } = useSearchFilters();
 
   const {
-    isSubscribed,
     hasReachedLimit,
     shouldShowGate,
+    isHydrated,
     incrementSearchCount,
     markAsSubscribed,
     canSearch,
@@ -72,34 +71,11 @@ export function SearchSection() {
     };
   } | null>(null);
 
-  /**
-   * Execute a search with gate check
-   */
-  const executeSearch = useCallback(
-    (params: {
-      topic: string;
-      tags: string[];
-      timeRange: string;
-      minUpvotes: number;
-      sortBy: string;
-    }) => {
-      // Check if user can search
-      if (!canSearch()) {
-        // Store pending search and show gate
-        pendingSearchRef.current = { type: "manual", params };
-        openGate();
-        return;
-      }
-
-      // Increment search count and perform search
-      incrementSearchCount();
-      performSearch(params);
-    },
-    [canSearch, incrementSearchCount, performSearch, openGate]
-  );
+  // Track if we're waiting for gate (to prevent URL effect from firing search)
+  const isWaitingForGateRef = useRef(false);
 
   /**
-   * Handle search trigger
+   * Handle search trigger (from search button)
    */
   const handleSearch = useCallback(() => {
     if (query.length < 2) return;
@@ -107,12 +83,15 @@ export function SearchSection() {
     // Check if user can search
     if (!canSearch()) {
       pendingSearchRef.current = { type: "manual" };
+      isWaitingForGateRef.current = true;
       openGate();
       return;
     }
 
+    // Increment count before syncing to URL (URL effect will trigger the actual search)
+    incrementSearchCount();
     syncToUrl();
-  }, [query, syncToUrl, canSearch, openGate]);
+  }, [query, syncToUrl, canSearch, openGate, incrementSearchCount]);
 
   /**
    * Handle search with a specific term (for badge clicks)
@@ -133,12 +112,13 @@ export function SearchSection() {
       // Check if user can search
       if (!canSearch()) {
         pendingSearchRef.current = { type: "badge", params: searchParams };
+        isWaitingForGateRef.current = true;
         openGate();
         return;
       }
 
       setQuery(searchTerm);
-      // Update URL and trigger search
+      // Update URL - the URL effect will trigger the search
       const params = new URLSearchParams();
       params.set("q", searchTerm);
       if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
@@ -146,8 +126,10 @@ export function SearchSection() {
       if (minUpvotes !== "10") params.set("upvotes", minUpvotes);
       if (sortBy !== "relevance") params.set("sort", sortBy);
 
-      window.history.pushState({}, "", `?${params.toString()}`);
+      // Increment count before updating URL (URL effect will trigger the actual search)
       incrementSearchCount();
+      window.history.pushState({}, "", `?${params.toString()}`);
+      // Manually trigger since pushState doesn't trigger URL change effect
       performSearch(searchParams);
     },
     [
@@ -168,6 +150,7 @@ export function SearchSection() {
    */
   const handleGateSuccess = useCallback(() => {
     markAsSubscribed();
+    isWaitingForGateRef.current = false;
 
     // Execute pending search if any
     const pending = pendingSearchRef.current;
@@ -175,24 +158,26 @@ export function SearchSection() {
       pendingSearchRef.current = null;
 
       if (pending.type === "manual" && !pending.params) {
-        // Manual search - sync to URL
+        // Manual search - sync to URL (will trigger URL effect)
         syncToUrl();
       } else if (pending.params) {
-        // Badge or manual with params - execute directly
+        // Badge or URL search with params - execute directly
         if (pending.type === "badge") {
           setQuery(pending.params.topic);
-          const params = new URLSearchParams();
-          params.set("q", pending.params.topic);
-          if (pending.params.tags.length > 0)
-            params.set("tags", pending.params.tags.join(","));
-          if (pending.params.timeRange !== "month")
-            params.set("time", pending.params.timeRange);
-          if (pending.params.minUpvotes !== 10)
-            params.set("upvotes", pending.params.minUpvotes.toString());
-          if (pending.params.sortBy !== "relevance")
-            params.set("sort", pending.params.sortBy);
-          window.history.pushState({}, "", `?${params.toString()}`);
         }
+        // Update URL
+        const params = new URLSearchParams();
+        params.set("q", pending.params.topic);
+        if (pending.params.tags.length > 0)
+          params.set("tags", pending.params.tags.join(","));
+        if (pending.params.timeRange !== "month")
+          params.set("time", pending.params.timeRange);
+        if (pending.params.minUpvotes !== 10)
+          params.set("upvotes", pending.params.minUpvotes.toString());
+        if (pending.params.sortBy !== "relevance")
+          params.set("sort", pending.params.sortBy);
+        window.history.pushState({}, "", `?${params.toString()}`);
+        // Execute search directly
         performSearch(pending.params);
       }
     }
@@ -202,6 +187,17 @@ export function SearchSection() {
    * Perform search when URL parameters change
    */
   useEffect(() => {
+    // Wait for hydration to complete before checking gate
+    // This ensures we have the correct search count from localStorage
+    if (!isHydrated) {
+      return;
+    }
+
+    // If we're waiting for gate, don't execute search from URL
+    if (isWaitingForGateRef.current) {
+      return;
+    }
+
     const urlQuery = urlSearchParams?.get("q");
     const urlTags = urlSearchParams?.get("tags");
     const urlTime = urlSearchParams?.get("time");
@@ -225,6 +221,7 @@ export function SearchSection() {
     // Check if user can search
     if (!canSearch()) {
       pendingSearchRef.current = { type: "url", params: searchParams };
+      isWaitingForGateRef.current = true;
       openGate();
       return;
     }
@@ -232,7 +229,8 @@ export function SearchSection() {
     // Perform search with URL parameters
     incrementSearchCount();
     performSearch(searchParams);
-  }, [urlSearchParams, performSearch, resetSearch, canSearch, openGate, incrementSearchCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearchParams, isHydrated]);
 
   // Check if we have any live data to show
   const hasLiveData = useMemo(() => {

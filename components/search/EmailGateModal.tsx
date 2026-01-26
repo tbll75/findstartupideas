@@ -111,14 +111,16 @@ export function EmailGateModal({
         const data = await response.json();
 
         if (!response.ok) {
-          // If validation error from backend
-          if (data.error) {
+          // Check if it's a validation error (400) vs server error (500)
+          if (response.status === 400 && data.error) {
+            // Validation error - don't let user through, show error
             setError(data.error);
-          } else {
-            setError("Something went wrong — but you're good to go!");
-            // Still mark as success since the user provided their email
-            onSuccess();
+            return;
           }
+          
+          // Server error (API failure) - show friendly message and let user through
+          setError("Something went wrong — but you're good to go!");
+          onSuccess();
           return;
         }
 

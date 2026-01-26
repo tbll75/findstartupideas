@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 // Constants
 const STORAGE_KEY_SEARCH_COUNT = "fsi_search_count";
@@ -16,6 +16,8 @@ export interface SearchGateState {
   hasReachedLimit: boolean;
   /** Whether the gate modal should be shown */
   shouldShowGate: boolean;
+  /** Whether the hook has loaded data from localStorage */
+  isHydrated: boolean;
 }
 
 export interface SearchGateActions {
@@ -45,6 +47,19 @@ export function useSearchGate(): SearchGateState & SearchGateActions {
   const [shouldShowGate, setShouldShowGate] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Use refs to always have current values for canSearch
+  const searchCountRef = useRef(searchCount);
+  const isSubscribedRef = useRef(isSubscribed);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    searchCountRef.current = searchCount;
+  }, [searchCount]);
+
+  useEffect(() => {
+    isSubscribedRef.current = isSubscribed;
+  }, [isSubscribed]);
+
   // Load state from localStorage on mount (client-side only)
   useEffect(() => {
     try {
@@ -55,11 +70,13 @@ export function useSearchGate(): SearchGateState & SearchGateActions {
         const count = parseInt(storedCount, 10);
         if (!isNaN(count) && count >= 0) {
           setSearchCount(count);
+          searchCountRef.current = count;
         }
       }
 
       if (storedSubscribed === "true") {
         setIsSubscribed(true);
+        isSubscribedRef.current = true;
       }
     } catch (err) {
       // localStorage not available (e.g., private browsing)
@@ -94,33 +111,36 @@ export function useSearchGate(): SearchGateState & SearchGateActions {
 
   /**
    * Check if user can perform a search
+   * Uses refs to always get current values
    */
   const canSearch = useCallback((): boolean => {
     // Subscribed users have unlimited searches
-    if (isSubscribed) return true;
+    if (isSubscribedRef.current) return true;
     // Non-subscribed users have limited searches
-    return searchCount < FREE_SEARCH_LIMIT;
-  }, [isSubscribed, searchCount]);
+    return searchCountRef.current < FREE_SEARCH_LIMIT;
+  }, []);
 
   /**
    * Increment search count
    */
   const incrementSearchCount = useCallback(() => {
     // Don't increment if already subscribed
-    if (isSubscribed) return;
+    if (isSubscribedRef.current) return;
 
     setSearchCount((prev) => {
       const newCount = prev + 1;
+      searchCountRef.current = newCount;
       persistSearchCount(newCount);
       return newCount;
     });
-  }, [isSubscribed, persistSearchCount]);
+  }, [persistSearchCount]);
 
   /**
    * Mark user as subscribed
    */
   const markAsSubscribed = useCallback(() => {
     setIsSubscribed(true);
+    isSubscribedRef.current = true;
     persistSubscribed(true);
     setShouldShowGate(false);
   }, [persistSubscribed]);
@@ -136,17 +156,18 @@ export function useSearchGate(): SearchGateState & SearchGateActions {
    * Close the gate modal
    */
   const closeGate = useCallback(() => {
-    // Only allow closing if not at limit
-    if (!hasReachedLimit) {
+    // Only allow closing if not at limit (use ref for current value)
+    if (isSubscribedRef.current || searchCountRef.current < FREE_SEARCH_LIMIT) {
       setShouldShowGate(false);
     }
-  }, [hasReachedLimit]);
+  }, []);
 
   return {
     searchCount,
     isSubscribed,
     hasReachedLimit,
     shouldShowGate,
+    isHydrated,
     incrementSearchCount,
     markAsSubscribed,
     canSearch,
