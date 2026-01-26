@@ -71,7 +71,7 @@ export function SearchFilters({
     <div className="mt-8">
       <Accordion className="w-full">
         <AccordionItem value="options" className="border-0">
-          <AccordionTrigger className="group flex items-center gap-2 py-3 px-5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm cursor-pointer">
+          <AccordionTrigger className="group flex items-center gap-2 py-3 px-3 text-sm font-medium text-muted-foreground hover:text-foreground rounded-xl hover:bg-secondary/50 transition-all duration-300 [&[data-state=open]]:bg-secondary/50 [&[data-state=open]]:shadow-sm cursor-pointer">
             <Filter className="w-4 h-4" />
             <span>Advanced Options</span>
           </AccordionTrigger>

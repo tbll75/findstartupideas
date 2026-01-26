@@ -10,6 +10,7 @@ import { SearchError } from "./SearchError";
 import { LiveStoriesFeed } from "./LiveStoriesFeed";
 import { LiveCommentsFeed } from "./LiveCommentsFeed";
 import { LivePainPointsFeed } from "./LivePainPointsFeed";
+import { ExampleSearchBadges } from "./ExampleSearchBadges";
 
 /**
  * Main search section component
@@ -54,6 +55,30 @@ export function SearchSection() {
     if (query.length < 2) return;
     syncToUrl();
   }, [query, syncToUrl]);
+
+  /**
+   * Handle search with a specific term (for badge clicks)
+   */
+  const handleSearchWithTerm = useCallback((searchTerm: string) => {
+    if (searchTerm.length < 2) return;
+    setQuery(searchTerm);
+    // Update URL and trigger search
+    const params = new URLSearchParams();
+    params.set("q", searchTerm);
+    if (selectedTags.length > 0) params.set("tags", selectedTags.join(","));
+    if (timeRange !== "month") params.set("time", timeRange);
+    if (minUpvotes !== 10) params.set("upvotes", minUpvotes.toString());
+    if (sortBy !== "relevance") params.set("sort", sortBy);
+    
+    window.history.pushState({}, "", `?${params.toString()}`);
+    performSearch({
+      topic: searchTerm,
+      tags: selectedTags,
+      timeRange,
+      minUpvotes,
+      sortBy,
+    });
+  }, [setQuery, selectedTags, timeRange, minUpvotes, sortBy, performSearch]);
 
   /**
    * Perform search when URL parameters change
@@ -121,6 +146,11 @@ export function SearchSection() {
           isLoading={isLoading}
           isPolling={isPolling}
         />
+
+        {/* Example Search Badges */}
+        {!isLoading && query.length < 2 && !hasLiveData && (
+          <ExampleSearchBadges onSelect={handleSearchWithTerm} />
+        )}
 
         {/* Advanced Filters */}
         <SearchFilters

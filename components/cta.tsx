@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { features } from "@/constants"
+import { SITE_CONFIG } from "@/constants/branding"
 
 export function CTASection() {
   const [isVisible, setIsVisible] = useState(false)
@@ -179,6 +180,11 @@ export function CTASection() {
                 )
               })}
             </div>
+          </div>
+
+          <div className="mt-10 flex justify-center text-sm text-muted-foreground">
+            <p>&copy; {new Date().getFullYear()} {SITE_CONFIG.name}. All rights reserved.</p>
+            
           </div>
         </div>
       </div>

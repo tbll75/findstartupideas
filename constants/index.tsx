@@ -2,11 +2,7 @@ import { BarChart3, Clock, Code2, Cpu, FileJson, Lightbulb, Megaphone, Rocket, S
 
 export const popularSearches = [
   "Notion",
-  "Shopify",
-  "Freelance",
-  "Remote work",
   "AI tools",
-  "Side hustle",
   "SaaS",
   "Productivity",
 ];
@@ -178,7 +174,7 @@ export const faqs = [
   },
   {
     question: "Is there a limit on searches?",
-    answer: "Free users get 5 searches per day, which is enough to explore a few startup ideas. Paid plans offer unlimited searches and advanced filters for power users who need to do extensive market research.",
+    answer: "Free users get 5 searches per day, which is enough to explore a few startup ideas.",
   },
 ]
 
