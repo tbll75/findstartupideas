@@ -85,7 +85,7 @@ export function SearchProgress({
       </div>
 
       {/* Phase indicator badge */}
-      {isActive && progress < 100 && phase !== "idle" && (
+      {/* {isActive && progress < 100 && phase !== "idle" && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/95 backdrop-blur-sm border border-border/60 shadow-elevation-2">
             <div className="text-primary">{getPhaseIcon()}</div>
@@ -95,7 +95,7 @@ export function SearchProgress({
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           </div>
         </div>
-      )}
+      )} */}
     </>
   );
 }

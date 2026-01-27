@@ -399,7 +399,7 @@ export function generateTweetText(
   painPointCount: number,
   topPainPoint?: string
 ): string {
-  let text = `🔍 Found ${painPointCount} startup ideas about "${topic}" from Hacker News discussions`;
+  let text = `🔍 Found ${painPointCount} pain points about "${topic}" from Hacker News discussions`;
   
   if (topPainPoint) {
     text += `\n\nTop opportunity: "${topPainPoint}"`;

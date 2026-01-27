@@ -194,7 +194,7 @@ const FullResultsCard = forwardRef<HTMLDivElement, ShareableCardFullProps>(
             <TrendingUp style={{ width: 14, height: 14, color: "white" }} />
           </div>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#6b21a8" }}>
-            {painPoints.length} Startup Ideas Found
+            {painPoints.length} Pain Points Found
           </span>
         </div>
 

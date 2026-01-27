@@ -163,7 +163,7 @@ export function ShareModal({
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
               <Dialog.Title className="text-lg font-semibold text-foreground">
-                {mode === "twitter" ? "Share on X" : "Download Screenshot"}
+                {mode === "twitter" ? "Share" : "Download Screenshot"}
               </Dialog.Title>
               <Dialog.Description className="text-sm text-muted-foreground mt-0.5">
                 {mode === "twitter"
@@ -191,7 +191,7 @@ export function ShareModal({
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => setVariant("full")}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
+                    className={`cursor-pointer flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
                       variant === "full"
                         ? "border-primary bg-primary/5 text-foreground"
                         : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/50"
@@ -205,7 +205,7 @@ export function ShareModal({
                   </button>
                   <button
                     onClick={() => setVariant("single")}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
+                    className={`cursor-pointer flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
                       variant === "single"
                         ? "border-primary bg-primary/5 text-foreground"
                         : "border-border bg-secondary/30 text-muted-foreground hover:bg-secondary/50"
@@ -247,7 +247,7 @@ export function ShareModal({
                     <Button
                       onClick={handleShareOnX}
                       disabled={isCapturing}
-                      className="w-full justify-center gap-2 bg-black hover:bg-black/90 text-white"
+                      className="cursor-pointer w-full justify-center gap-2 bg-black hover:bg-black/90 text-white"
                     >
                       {isCapturing ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -271,7 +271,7 @@ export function ShareModal({
                     <Button
                       onClick={() => handleDownload("png")}
                       disabled={isCapturing}
-                      className="w-full justify-center gap-2"
+                      className="cursor-pointer w-full justify-center gap-2"
                     >
                       {isCapturing ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -284,7 +284,7 @@ export function ShareModal({
                       onClick={() => handleDownload("jpeg")}
                       disabled={isCapturing}
                       variant="outline"
-                      className="w-full justify-center gap-2"
+                      className="cursor-pointer w-full justify-center gap-2"
                     >
                       {isCapturing ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -298,7 +298,7 @@ export function ShareModal({
                         onClick={handleCopyToClipboard}
                         disabled={isCapturing}
                         variant="outline"
-                        className="w-full justify-center gap-2"
+                        className="cursor-pointer w-full justify-center gap-2"
                       >
                         {isCapturing ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
