@@ -37,7 +37,7 @@ export function HeroSection() {
   }, [handleSearch])
 
   return (
-    <section className="relative min-h-[60vh] flex items-center pt-28 overflow-hidden">
+    <section className="relative min-h-[60vh] flex items-center pt-20 overflow-hidden">
       {/* Premium layered background */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         {/* Primary gradient dome */}
@@ -104,7 +104,7 @@ export function HeroSection() {
               </span>
             </span>
             <span className="text-sm font-medium text-foreground/90">
-              AI-Powered Startup Idea Discovery
+              AI-Powered Discovery
             </span>
             <span className="flex items-center gap-1.5 pl-2 border-l border-border/50">
               <span className="relative flex h-2 w-2">

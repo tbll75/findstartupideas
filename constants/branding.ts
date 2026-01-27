@@ -14,7 +14,7 @@ export const SITE_CONFIG = {
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://findstartupideas.com",
   
   // SEO metadata
-  title: "Find Startup Ideas — Discover Validated Ideas from Real Pain Points",
+  title: "Find Startup Ideas — Discover Ideas from Real Pain Points",
   description: "Find validated startup ideas by analyzing real user pain points from Hacker News discussions. AI-powered startup idea discovery in seconds.",
   
   // Primary and secondary keywords for SEO

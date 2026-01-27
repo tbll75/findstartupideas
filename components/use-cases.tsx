@@ -146,23 +146,6 @@ export function UseCasesSection() {
                     </div>
                   </div>
 
-                  {/* CTA */}
-                  <Link
-                    href={`/search?q=${encodeURIComponent(useCase.example.search)}`}
-                    className={cn(
-                      "inline-flex items-center gap-2 mt-7 text-sm font-semibold transition-all duration-300 group/link focus-ring rounded-md",
-                      useCase.accentColor
-                    )}
-                  >
-                    <span className="relative">
-                      Try this search
-                      <span className={cn(
-                        "absolute -bottom-0.5 left-0 w-full h-0.5 rounded-full scale-x-0 group-hover/link:scale-x-100 transition-transform duration-300 origin-left",
-                        `bg-gradient-to-r ${useCase.gradient}`
-                      )} />
-                    </span>
-                    <ArrowUpRight className="w-4 h-4 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform duration-300" />
-                  </Link>
                 </div>
               </div>
             )

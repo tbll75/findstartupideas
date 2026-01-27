@@ -72,7 +72,7 @@ export function ExampleSearchBadges({ onSelect }: ExampleSearchBadgesProps) {
               key={search}
               onClick={() => onSelect(search)}
               className={cn(
-                "group relative px-3 py-1 rounded-xl",
+                "cursor-pointer group relative px-3 py-1 rounded-xl",
                 "bg-gradient-to-br",
                 badgeGradients[gradientIndex],
                 "border border-solid",

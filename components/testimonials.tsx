@@ -185,16 +185,7 @@ export function TestimonialsSection() {
                   </div>
 
                   {/* CTA */}
-                  <Link
-                    href={`/search?q=${encodeURIComponent(testimonial.searchTerm)}`}
-                    className={cn(
-                      "inline-flex items-center gap-2 mt-6 text-sm font-semibold text-primary transition-all duration-300 group/link focus-ring rounded-md",
-                      "opacity-0 group-hover:opacity-100"
-                    )}
-                  >
-                    <span>Try this search</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover/link:translate-x-1 transition-transform duration-300" />
-                  </Link>
+                  
                 </div>
               </div>
             )

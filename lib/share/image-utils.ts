@@ -14,6 +14,161 @@ interface CaptureOptions {
 }
 
 /**
+ * Convert a color value to hex format
+ * Handles oklch(), lab(), rgb(), and other color formats
+ */
+function convertColorToHex(color: string): string {
+  if (!color || color === "transparent" || color === "none" || color === "rgba(0, 0, 0, 0)") {
+    return "#ffffff";
+  }
+
+  // If already hex, return as is
+  if (color.startsWith("#") && (color.length === 4 || color.length === 7)) {
+    return color;
+  }
+
+  // Try to parse using a temporary element
+  try {
+    const tempEl = document.createElement("div");
+    tempEl.style.color = color;
+    tempEl.style.position = "absolute";
+    tempEl.style.visibility = "hidden";
+    tempEl.style.pointerEvents = "none";
+    document.body.appendChild(tempEl);
+    const computedColor = window.getComputedStyle(tempEl).color;
+    document.body.removeChild(tempEl);
+
+    // Convert rgb/rgba to hex
+    const rgbMatch = computedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1], 10).toString(16).padStart(2, "0");
+      const g = parseInt(rgbMatch[2], 10).toString(16).padStart(2, "0");
+      const b = parseInt(rgbMatch[3], 10).toString(16).padStart(2, "0");
+      return `#${r}${g}${b}`;
+    }
+  } catch (e) {
+    // Fallback if parsing fails
+  }
+
+  // Fallback to white if all else fails
+  return "#ffffff";
+}
+
+/**
+ * Fix color values in cloned DOM to avoid html2canvas parsing errors
+ * This prevents issues with modern CSS color functions like oklch() and lab()
+ * Since ShareableCard uses inline styles, we can safely remove all external stylesheets
+ */
+function fixColorsInClone(clonedDoc: Document): void {
+  try {
+    // Remove all link tags that reference external stylesheets
+    // These might contain problematic color functions like oklch() and lab()
+    const linkTags = clonedDoc.querySelectorAll("link[rel='stylesheet']");
+    linkTags.forEach((tag) => tag.remove());
+    
+    // Remove ALL style tags - ShareableCard uses inline styles only
+    // This prevents html2canvas from parsing problematic color functions
+    const styleTags = clonedDoc.querySelectorAll("style");
+    styleTags.forEach((tag) => tag.remove());
+
+    // Then fix computed styles on elements
+    const allElements = clonedDoc.querySelectorAll("*");
+    
+    allElements.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      if (!htmlEl) return;
+      
+      const style = htmlEl.style;
+      if (!style) return;
+      
+      // Get computed styles that might contain problematic color values
+      const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl);
+      if (!computedStyle) return;
+      
+      // Fix background-color
+      const bgColor = computedStyle.backgroundColor;
+      if (bgColor && bgColor !== "transparent" && bgColor !== "rgba(0, 0, 0, 0)") {
+        try {
+          // Only override if it contains problematic color functions
+          if (bgColor.includes("lab(") || bgColor.includes("oklch(") || bgColor.includes("lch(")) {
+            style.backgroundColor = convertColorToHex(bgColor);
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+      
+      // Fix color
+      const textColor = computedStyle.color;
+      if (textColor) {
+        try {
+          if (textColor.includes("lab(") || textColor.includes("oklch(") || textColor.includes("lch(")) {
+            style.color = convertColorToHex(textColor);
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+      
+      // Fix border-color
+      const borderColor = computedStyle.borderColor;
+      if (borderColor && borderColor !== "transparent") {
+        try {
+          if (borderColor.includes("lab(") || borderColor.includes("oklch(") || borderColor.includes("lch(")) {
+            style.borderColor = convertColorToHex(borderColor);
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+    });
+  } catch (e) {
+    // Silently fail - html2canvas will handle it
+    console.warn("Error fixing colors in clone:", e);
+  }
+}
+
+/**
+ * Temporarily disable all stylesheets to prevent html2canvas from parsing problematic colors
+ * Since ShareableCard uses inline styles, we don't need external stylesheets
+ * Returns a function to restore them
+ */
+function disableProblematicStylesheets(): (() => void) {
+  const disabledSheets: { sheet: CSSStyleSheet; originalDisabled: boolean }[] = [];
+  
+  try {
+    // Disable ALL stylesheets - ShareableCard uses inline styles only
+    // This prevents html2canvas from parsing oklch() and lab() color functions
+    for (let i = 0; i < document.styleSheets.length; i++) {
+      const sheet = document.styleSheets[i];
+      try {
+        disabledSheets.push({
+          sheet,
+          originalDisabled: sheet.disabled,
+        });
+        sheet.disabled = true;
+      } catch (e) {
+        // Skip stylesheets we can't access (cross-origin, etc.)
+        continue;
+      }
+    }
+  } catch (e) {
+    // If we can't access stylesheets, continue anyway
+  }
+  
+  // Return restore function
+  return () => {
+    disabledSheets.forEach(({ sheet, originalDisabled }) => {
+      try {
+        sheet.disabled = originalDisabled;
+      } catch (e) {
+        // Ignore errors when restoring
+      }
+    });
+  };
+}
+
+/**
  * Capture a DOM element as an image blob
  */
 export async function captureElement(
@@ -27,30 +182,87 @@ export async function captureElement(
     backgroundColor = "#faf9f7", // Match app background
   } = options;
 
-  const canvas = await html2canvas(element, {
-    scale,
-    backgroundColor,
-    useCORS: true,
-    allowTaint: false,
-    logging: false,
-    // Improve rendering quality
-    imageTimeout: 15000,
-    removeContainer: true,
-  });
+  // Temporarily disable problematic stylesheets
+  const restoreStylesheets = disableProblematicStylesheets();
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) {
-          resolve(blob);
-        } else {
-          reject(new Error("Failed to create image blob"));
-        }
+  try {
+    const canvas = await html2canvas(element, {
+      scale,
+      backgroundColor,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      // Improve rendering quality
+      imageTimeout: 15000,
+      removeContainer: true,
+      // Fix color parsing issues with modern CSS color functions
+      onclone: (clonedDoc) => {
+        fixColorsInClone(clonedDoc);
       },
-      `image/${format}`,
-      quality
-    );
-  });
+      // Disable foreign object rendering to avoid color parsing issues
+      foreignObjectRendering: false,
+    });
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Failed to create image blob"));
+          }
+        },
+        `image/${format}`,
+        quality
+      );
+    });
+  } catch (error) {
+    // If error is related to color parsing, try with a simpler configuration
+    if (error instanceof Error && (error.message.includes("color") || error.message.includes("lab") || error.message.includes("oklch"))) {
+      console.warn("Color parsing error detected, retrying with simplified configuration");
+      
+      try {
+        const canvas = await html2canvas(element, {
+          scale: 1, // Lower scale for faster processing
+          backgroundColor: "#faf9f7",
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+          imageTimeout: 10000,
+          removeContainer: true,
+          foreignObjectRendering: false,
+          // More aggressive color fixing
+          onclone: (clonedDoc) => {
+            // fixColorsInClone already removes all style and link tags
+            fixColorsInClone(clonedDoc);
+          },
+        });
+
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error("Failed to create image blob"));
+              }
+            },
+            `image/${format}`,
+            quality
+          );
+        });
+      } catch (retryError) {
+        throw new Error(
+          `Failed to capture element: ${retryError instanceof Error ? retryError.message : "Unknown error"}`
+        );
+      }
+    }
+    
+    throw error;
+  } finally {
+    // Always restore stylesheets
+    restoreStylesheets();
+  }
 }
 
 /**
