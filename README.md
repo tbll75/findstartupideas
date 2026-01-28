@@ -1,4 +1,4 @@
-# Reminer - Hacker News Pain Miner
+# Find Startup Ideas - Hacker News Pain Miner
 
 > Discover validated product ideas by mining real pain points from Hacker News discussions.
 
