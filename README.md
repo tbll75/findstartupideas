@@ -9,7 +9,9 @@ A production-ready tool that analyzes Hacker News conversations to extract custo
 - **Real-time HN Analysis** - Search any topic and get instant insights from thousands of discussions
 - **AI-Powered Clustering** - Gemini 2.0 Flash analyzes and groups pain points by theme
 - **Smart Caching** - Redis-backed caching for lightning-fast repeated searches
-- **Rate Limiting** - IP-based and topic-based rate limiting to prevent abuse
+- **Rate Limiting** - Global (60/min), per-IP (3/min, 10/day), and topic-based rate limiting
+- **Queue Backup** - pg_cron picks up failed/stuck searches every minute
+- **Auto-Retry** - Failed searches retry up to 3 times with exponential backoff
 - **Advanced Filters** - Filter by HN tags, time range, upvotes, and sort order
 
 ## Tech Stack
@@ -56,18 +58,105 @@ yarn install
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to **Project Settings → API** and copy:
-
    - Project URL (NEXT_PUBLIC_SUPABASE_URL)
    - publishable key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
    - service_role key (SUPABASE_SERVICE_ROLE_KEY)
 
 3. Run the database schema:
-
    - Go to **SQL Editor** in Supabase dashboard
-   - Copy contents from `supabase/migrations/schema.sql`
+   - Copy contents from `supabase/schema.sql`
    - Execute the SQL
 
-4. Set up RLS policies (already included in schema.sql)
+4. Run the queue processing setup (pg_cron + pg_net for resilience):
+   - Go to **SQL Editor** in Supabase dashboard
+   - Copy contents from `supabase/migrations/20250124_add_queue_processing.sql`
+   - Execute the SQL
+
+5. Set up the config table for pg_cron (required on free tier - ALTER DATABASE has permission restrictions):
+   - Go to **SQL Editor** in Supabase dashboard
+   - Run the following SQL, replacing `YOUR_PROJECT_REF` and `YOUR_SERVICE_ROLE_KEY` with your actual values:
+
+   ```sql
+   -- Create config table for pg_cron (free tier compatible)
+   CREATE TABLE IF NOT EXISTS app_config (
+     key TEXT PRIMARY KEY,
+     value TEXT NOT NULL,
+     created_at TIMESTAMPTZ DEFAULT NOW(),
+     updated_at TIMESTAMPTZ DEFAULT NOW()
+   );
+
+   ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
+
+   CREATE POLICY app_config_service_role_read ON app_config
+     FOR SELECT USING (auth.role() = 'service_role');
+
+   -- Insert your configuration (REPLACE THE PLACEHOLDERS!)
+   INSERT INTO app_config (key, value) VALUES
+     ('supabase_url', 'https://YOUR_PROJECT_REF.supabase.co'),
+     ('service_role_key', 'YOUR_SERVICE_ROLE_KEY')
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();
+   ```
+
+6. Update the queue function to read from app_config (required - the migration uses current_setting which fails on free tier):
+   - Go to **SQL Editor** in Supabase dashboard
+   - Run the following SQL to fix the `process_pending_searches` function:
+
+   ```sql
+   CREATE OR REPLACE FUNCTION process_pending_searches()
+   RETURNS void
+   LANGUAGE plpgsql
+   SECURITY DEFINER
+   SET search_path = public
+   AS $$
+   DECLARE
+     v_search RECORD;
+     v_count INTEGER := 0;
+     v_max_concurrent INTEGER := 3;
+     v_supabase_url TEXT;
+     v_service_role_key TEXT;
+   BEGIN
+     SELECT value INTO v_supabase_url FROM app_config WHERE key = 'supabase_url';
+     SELECT value INTO v_service_role_key FROM app_config WHERE key = 'service_role_key';
+
+     IF v_supabase_url IS NULL OR v_service_role_key IS NULL THEN
+       RAISE WARNING '[process_pending_searches] Missing config in app_config table';
+       RETURN;
+     END IF;
+
+     FOR v_search IN
+       SELECT id FROM searches
+       WHERE status = 'pending' AND retry_count < 3
+         AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+       ORDER BY created_at ASC LIMIT v_max_concurrent
+       FOR UPDATE SKIP LOCKED
+     LOOP
+       UPDATE searches SET status = 'processing', last_retry_at = NOW() WHERE id = v_search.id;
+       v_count := v_count + 1;
+
+       PERFORM net.http_post(
+         v_supabase_url || '/functions/v1/scrape_and_analyze',
+         jsonb_build_object('searchId', v_search.id),
+         '{}',
+         jsonb_build_object(
+           'Authorization', 'Bearer ' || v_service_role_key,
+           'Content-Type', 'application/json'
+         )
+       );
+     END LOOP;
+   END;
+   $$;
+   ```
+
+7. RLS policies are already included in schema.sql
+
+**Verify Supabase setup:**
+
+```sql
+-- Run in SQL Editor to verify (both counts should be 2)
+SELECT 'Cron Jobs' as check_type, COUNT(*)::text as count FROM cron.job WHERE active = true AND jobname LIKE '%search%'
+UNION ALL
+SELECT 'Config Table', COUNT(*)::text FROM app_config;
+```
 
 ### 4. Set Up Upstash Redis
 
