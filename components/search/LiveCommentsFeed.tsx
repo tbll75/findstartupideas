@@ -3,6 +3,20 @@
 import { useMemo } from "react";
 import { MessageCircle, User, ArrowBigUp, ExternalLink } from "lucide-react";
 
+/** Decodes HTML entities (e.g. &#x27; → ') for safe display. Pure JS for SSR compatibility. */
+function decodeHtmlEntities(str: string): string {
+  if (typeof str !== "string" || !str) return str;
+  return str
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&sol;/g, "/");
+}
+
 interface CommentPreview {
   id: string;
   snippet: string;
@@ -133,7 +147,7 @@ function CommentCard({ comment, index }: { comment: CommentPreview; index: numbe
         <div className="relative p-4 pl-5">
           {/* Comment text */}
           <p className="text-sm text-foreground/90 leading-relaxed line-clamp-3 mb-3">
-            {comment.snippet}
+            {decodeHtmlEntities(comment.snippet)}
           </p>
 
           {/* Comment metadata */}
@@ -143,7 +157,7 @@ function CommentCard({ comment, index }: { comment: CommentPreview; index: numbe
               {comment.author && (
                 <div className="flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" />
-                  <span className="font-medium">{comment.author}</span>
+                  <span className="font-medium">{decodeHtmlEntities(comment.author)}</span>
                 </div>
               )}
 
