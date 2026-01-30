@@ -3,7 +3,7 @@
  * Fixed-window rate limiting using Redis
  */
 
-import { redisCommand, redisSetNX, redisIncr, redisTTL } from "./client";
+import { redisSetNX, redisIncr, redisTTL, redisExpire } from "./client";
 
 /**
  * Rate limit configuration
@@ -92,8 +92,15 @@ export async function applyRateLimit(
     };
   }
 
-  // Key already exists, increment it
+  // Key already exists, increment it (or key was created by INCR with no TTL)
   const currentCount = await redisIncr(key);
+
+  // If key has no TTL (created by INCR on non-existent key when SET NX failed),
+  // set expiry to prevent the key from persisting forever
+  const ttlSeconds = await redisTTL(key);
+  if (ttlSeconds === -1) {
+    await redisExpire(key, windowSeconds);
+  }
 
   // If Redis is down or returns invalid data
   if (!Number.isFinite(currentCount)) {
@@ -109,7 +116,6 @@ export async function applyRateLimit(
   }
 
   // Get TTL to calculate resetAt accurately
-  const ttlSeconds = await redisTTL(key);
   const effectiveTtl = ttlSeconds > 0 ? ttlSeconds : windowSeconds;
 
   const remaining = Math.max(0, maxRequests - currentCount);

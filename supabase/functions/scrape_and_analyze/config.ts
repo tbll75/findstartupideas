@@ -41,7 +41,7 @@ export const DEFAULT_RESULT_TTL_SECONDS = 60 * 60 * 2;
 export const HN_MAX_STORIES = 60;
 
 /** Number of stories to fetch comments for (reduced for API efficiency) */
-export const HN_STORIES_FOR_COMMENTS = 15;
+export const HN_STORIES_FOR_COMMENTS = 20;
 
 /** Maximum comments per story */
 export const HN_MAX_COMMENTS_PER_STORY = 20;

@@ -171,6 +171,23 @@ export async function redisIncr(key: string): Promise<number> {
 }
 
 /**
+ * Set TTL on a key
+ * @param key - Redis key
+ * @param seconds - TTL in seconds
+ * @returns True if TTL was set
+ */
+export async function redisExpire(
+  key: string,
+  seconds: number
+): Promise<boolean> {
+  const { result, error } = await redisCommand<number>("EXPIRE", key, seconds);
+  if (error) {
+    console.error(`[redisExpire] Failed for key ${key}:`, error);
+  }
+  return result === 1;
+}
+
+/**
  * Get TTL of a key
  * @param key - Redis key
  * @returns TTL in seconds, -1 if no TTL, -2 if key doesn't exist

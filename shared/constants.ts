@@ -18,19 +18,19 @@ export const SEARCH_KEY_MAPPING_TTL_SECONDS = 60 * 60 * 2;
 // ============================================================================
 
 /** Global rate limit: max requests across all users in window */
-export const RATE_LIMIT_GLOBAL_MAX_REQUESTS = 60;
+export const RATE_LIMIT_GLOBAL_MAX_REQUESTS = 300;
 
 /** Global rate limit: window duration in seconds (1 minute) */
 export const RATE_LIMIT_GLOBAL_WINDOW_SECONDS = 60;
 
 /** Per-IP rate limit: max requests in window (per minute) */
-export const RATE_LIMIT_IP_MAX_REQUESTS = 3;
+export const RATE_LIMIT_IP_MAX_REQUESTS = 7;
 
 /** Per-IP rate limit: window duration in seconds (1 minute) */
 export const RATE_LIMIT_IP_WINDOW_SECONDS = 60;
 
 /** Per-IP daily rate limit: max requests per day */
-export const RATE_LIMIT_IP_DAILY_MAX_REQUESTS = 10;
+export const RATE_LIMIT_IP_DAILY_MAX_REQUESTS = 30;
 
 /** Per-IP daily rate limit: window duration in seconds (24 hours) */
 export const RATE_LIMIT_IP_DAILY_WINDOW_SECONDS = 86400;
@@ -49,7 +49,7 @@ export const RATE_LIMIT_TOPIC_WINDOW_SECONDS = 60;
 export const HN_MAX_STORIES = 60;
 
 /** Number of stories to fetch comments for (reduced for API efficiency) */
-export const HN_STORIES_FOR_COMMENTS = 15;
+export const HN_STORIES_FOR_COMMENTS = 20;
 
 /** Maximum comments per story */
 export const HN_MAX_COMMENTS_PER_STORY = 20;
