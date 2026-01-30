@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { SearchResult, SearchResultItem } from "@/types";
+import type { SearchResult, SearchResultItem, ProductIdea } from "@/types";
 import { transformSearchResult } from "../utils/transform-results";
 import { CLIENT_POLL_INTERVAL_MS, CLIENT_MAX_POLL_ATTEMPTS } from "@/shared/constants";
 import { supabaseBrowserClient } from "@/lib/supabase-browser";
@@ -36,6 +36,7 @@ export interface SearchState {
   }[];
   painPointsIncremental: SearchResultItem[];
   liveAnalysisSummary?: string | null;
+  productIdeas: ProductIdea[];
 }
 
 export interface SearchActions {
@@ -72,6 +73,7 @@ export function useSearch(): SearchState & SearchActions {
   const [comments, setComments] = useState<SearchState["comments"]>([]);
   const [painPointsIncremental, setPainPointsIncremental] = useState<SearchResultItem[]>([]);
   const [liveAnalysisSummary, setLiveAnalysisSummary] = useState<string | null>(null);
+  const [productIdeas, setProductIdeas] = useState<ProductIdea[]>([]);
 
   // Refs for cleanup and deduplication
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -322,6 +324,11 @@ export function useSearch(): SearchState & SearchActions {
     if (result.analysis?.summary) {
       setLiveAnalysisSummary(result.analysis.summary);
     }
+
+    // Set product ideas if available
+    if (Array.isArray(result.analysis?.productIdeas) && result.analysis.productIdeas.length > 0) {
+      setProductIdeas(result.analysis.productIdeas);
+    }
   }, []);
 
   /**
@@ -383,15 +390,27 @@ export function useSearch(): SearchState & SearchActions {
         setPhase("analysis");
       }
 
-      // Also check for AI analysis summary
+      // Also check for AI analysis (summary and product ideas)
       const { data: analysis } = await supabaseBrowserClient
         .from("ai_analyses")
-        .select("summary")
+        .select("summary, product_ideas")
         .eq("search_id", id)
         .maybeSingle();
 
       if (analysis?.summary) {
         setLiveAnalysisSummary(analysis.summary);
+      }
+      if (Array.isArray(analysis?.product_ideas) && analysis.product_ideas.length > 0) {
+        const validIdeas = (analysis.product_ideas as unknown[]).filter(
+          (item): item is ProductIdea =>
+            item !== null &&
+            typeof item === "object" &&
+            typeof (item as Record<string, unknown>).title === "string" &&
+            typeof (item as Record<string, unknown>).description === "string" &&
+            typeof (item as Record<string, unknown>).targetProblem === "string" &&
+            typeof (item as Record<string, unknown>).impactScore === "number"
+        );
+        setProductIdeas(validIdeas);
       }
     } catch (err) {
       console.error("[Realtime] Failed to backfill pain points:", err);
@@ -567,8 +586,20 @@ export function useSearch(): SearchState & SearchActions {
         },
         (payload) => {
           if (!payload.new || currentSearchIdRef.current !== id) return;
-          const row = payload.new as { summary: string };
+          const row = payload.new as { summary: string; product_ideas?: unknown[] };
           setLiveAnalysisSummary(row.summary);
+          if (Array.isArray(row.product_ideas) && row.product_ideas.length > 0) {
+            const validIdeas = row.product_ideas.filter(
+              (item): item is ProductIdea =>
+                item !== null &&
+                typeof item === "object" &&
+                typeof (item as Record<string, unknown>).title === "string" &&
+                typeof (item as Record<string, unknown>).description === "string" &&
+                typeof (item as Record<string, unknown>).targetProblem === "string" &&
+                typeof (item as Record<string, unknown>).impactScore === "number"
+            );
+            setProductIdeas(validIdeas);
+          }
         }
       );
 
@@ -698,6 +729,7 @@ export function useSearch(): SearchState & SearchActions {
     setComments([]);
     setPainPointsIncremental([]);
     setLiveAnalysisSummary(null);
+    setProductIdeas([]);
     painPointIndexRef.current = {};
     seenStoryIdsRef.current = new Set();
     seenCommentIdsRef.current = new Set();
@@ -843,6 +875,7 @@ export function useSearch(): SearchState & SearchActions {
     comments,
     painPointsIncremental,
     liveAnalysisSummary,
+    productIdeas,
     performSearch,
     resetSearch,
     bumpProgress,

@@ -29,6 +29,7 @@ export function SearchSection() {
     comments,
     painPointsIncremental,
     liveAnalysisSummary,
+    productIdeas,
     performSearch,
     resetSearch,
   } = useSearch();
@@ -234,8 +235,8 @@ export function SearchSection() {
 
   // Check if we have any live data to show
   const hasLiveData = useMemo(() => {
-    return stories.length > 0 || comments.length > 0 || painPointsIncremental.length > 0;
-  }, [stories.length, comments.length, painPointsIncremental.length]);
+    return stories.length > 0 || comments.length > 0 || painPointsIncremental.length > 0 || productIdeas.length > 0;
+  }, [stories.length, comments.length, painPointsIncremental.length, productIdeas.length]);
 
   // Remove debug logging
   // console.log("[SearchSection] State:", {
@@ -321,11 +322,12 @@ export function SearchSection() {
             )}
 
             {/* Phase 3: Live Pain Points Feed (AI Analysis) */}
-            {(painPointsIncremental.length > 0 || phase === "analysis" || phase === "completed") && (
+            {(painPointsIncremental.length > 0 || productIdeas.length > 0 || phase === "analysis" || phase === "completed") && (
               <LivePainPointsFeed
                 painPoints={painPointsIncremental}
                 phase={phase}
                 liveAnalysisSummary={liveAnalysisSummary}
+                productIdeas={productIdeas}
                 topic={urlSearchParams?.get("q") || query}
               />
             )}

@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { Sparkles, TrendingUp, Quote, User, ArrowBigUp, ExternalLink, Share2 } from "lucide-react";
-import type { SearchResultItem } from "@/types";
+import { Sparkles, TrendingUp, Quote, User, ArrowBigUp, ExternalLink, Share2, Lightbulb, Target } from "lucide-react";
+import type { SearchResultItem, ProductIdea } from "@/types";
 import { getHNTagLabel } from "./utils/transform-results";
 import { ShareToolbar } from "./ShareToolbar";
 import { ShareModal } from "./ShareModal";
@@ -11,6 +11,7 @@ interface LivePainPointsFeedProps {
   painPoints: SearchResultItem[];
   phase: string;
   liveAnalysisSummary?: string | null;
+  productIdeas?: ProductIdea[];
   topic?: string;
 }
 
@@ -22,6 +23,7 @@ export function LivePainPointsFeed({
   painPoints,
   phase,
   liveAnalysisSummary,
+  productIdeas = [],
   topic = "",
 }: LivePainPointsFeedProps) {
   // Memoize pain points to prevent unnecessary re-renders
@@ -37,11 +39,11 @@ export function LivePainPointsFeed({
     setShareModalOpen(true);
   }, []);
 
-  // Don't render if no pain points and not in analysis phase
-  if (!painPoints.length && phase !== "analysis") return null;
+  // Don't render if no pain points, no product ideas, and not in analysis phase
+  if (!painPoints.length && !productIdeas.length && phase !== "analysis") return null;
 
-  // Show share toolbar when we have pain points (completed or analysis phase with data)
-  const showShareToolbar = painPoints.length > 0 && (phase === "completed" || phase === "analysis");
+  // Show share toolbar when we have pain points or product ideas (completed or analysis phase with data)
+  const showShareToolbar = (painPoints.length > 0 || productIdeas.length > 0) && (phase === "completed" || phase === "analysis");
 
   return (
     <div className="mt-8 space-y-6">
@@ -131,8 +133,25 @@ export function LivePainPointsFeed({
         </div>
       )}
 
+      {/* Product Ideas Section */}
+      {productIdeas.length > 0 && (
+        <div className="space-y-4 mt-8">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+            <h3 className="text-base font-semibold text-foreground">
+              Product Ideas ({productIdeas.length})
+            </h3>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+            {productIdeas.map((idea, index) => (
+              <ProductIdeaCard key={`${idea.title}-${index}`} idea={idea} index={index} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Processing indicator when no pain points visible yet */}
-      {displayPainPoints.length === 0 && phase === "analysis" && (
+      {displayPainPoints.length === 0 && productIdeas.length === 0 && phase === "analysis" && (
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/50 border border-border/60">
             <div className="flex gap-1.5">
@@ -281,6 +300,49 @@ function PainPointItem({
 
         {/* Shimmer effect on hover */}
         <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Product idea card
+ */
+function ProductIdeaCard({ idea, index }: { idea: ProductIdea; index: number }) {
+  return (
+    <div
+      className="group relative animate-reveal-up rounded-2xl bg-card border border-border/60 overflow-hidden transition-all duration-300 hover:border-amber-500/30 hover:shadow-elevation-3 hover:-translate-y-0.5"
+      style={{
+        animationDelay: `${Math.min(index * 80, 400)}ms`,
+        animationFillMode: "backwards",
+      }}
+    >
+      <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+      <div className="relative p-5">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-500/10 flex items-center justify-center flex-shrink-0">
+            <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-semibold text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+              {idea.title}
+            </h4>
+            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+              {idea.description}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 ml-11">
+          <Target className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">
+            Addresses: <span className="font-medium text-foreground/80">{idea.targetProblem}</span>
+          </span>
+        </div>
+        <div className="mt-3 ml-11 flex items-center gap-2">
+          <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+            Impact: {idea.impactScore}/10
+          </span>
+        </div>
       </div>
     </div>
   );
