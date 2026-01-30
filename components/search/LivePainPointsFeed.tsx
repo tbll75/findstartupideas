@@ -26,8 +26,11 @@ export function LivePainPointsFeed({
   productIdeas = [],
   topic = "",
 }: LivePainPointsFeedProps) {
-  // Memoize pain points to prevent unnecessary re-renders
-  const displayPainPoints = useMemo(() => painPoints, [painPoints]);
+  // Only show pain points that have supporting quotes/evidence
+  const displayPainPoints = useMemo(
+    () => painPoints.filter((pp) => pp.quotes?.length > 0),
+    [painPoints]
+  );
 
   // State for individual pain point sharing
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -42,8 +45,8 @@ export function LivePainPointsFeed({
   // Don't render if no pain points, no product ideas, and not in analysis phase
   if (!painPoints.length && !productIdeas.length && phase !== "analysis") return null;
 
-  // Show share toolbar when we have pain points or product ideas (completed or analysis phase with data)
-  const showShareToolbar = (painPoints.length > 0 || productIdeas.length > 0) && (phase === "completed" || phase === "analysis");
+  // Show share toolbar when we have pain points with quotes or product ideas (completed or analysis phase with data)
+  const showShareToolbar = (displayPainPoints.length > 0 || productIdeas.length > 0) && (phase === "completed" || phase === "analysis");
 
   return (
     <div className="mt-8 space-y-6">
@@ -67,7 +70,7 @@ export function LivePainPointsFeed({
               <p className="text-sm text-muted-foreground mt-0.5">
                 Identified{" "}
                 <span className="text-purple-600 dark:text-purple-400 font-semibold tabular-nums">
-                  {painPoints.length}
+                  {displayPainPoints.length}
                 </span>{" "}
                 pain points with evidence
               </p>
@@ -79,7 +82,7 @@ export function LivePainPointsFeed({
             {showShareToolbar && (
               <ShareToolbar
                 topic={topic}
-                painPoints={painPoints}
+                painPoints={displayPainPoints}
                 summary={liveAnalysisSummary}
               />
             )}
@@ -180,7 +183,7 @@ export function LivePainPointsFeed({
         open={shareModalOpen}
         onOpenChange={setShareModalOpen}
         topic={topic}
-        painPoints={painPoints}
+        painPoints={displayPainPoints}
         summary={liveAnalysisSummary}
         selectedPainPointIndex={selectedPainPointIndex}
         mode="screenshot"

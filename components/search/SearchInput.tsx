@@ -102,7 +102,7 @@ export function SearchInput({
               setShowSuggestions(false);
             }
           }}
-          placeholder="Enter keyword (e.g., Notion, Shopify, Freelance)"
+          placeholder="Enter keyword (e.g., AI Videos, Remote Jobs, Next.js)"
           className="w-full h-16 lg:h-[72px] pl-14 pr-36 text-base lg:text-lg bg-transparent border-0 outline-none placeholder:text-muted-foreground/50"
         />
 
@@ -129,9 +129,7 @@ export function SearchInput({
             )}
             style={{
               boxShadow:
-                query.length >= 2
-                  ? "0 4px 12px rgba(0,0,0,0.15)"
-                  : undefined,
+                query.length >= 2 ? "0 4px 12px rgba(0,0,0,0.15)" : undefined,
             }}
           >
             {isLoading ? (
