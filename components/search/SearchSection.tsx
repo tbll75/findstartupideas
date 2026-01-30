@@ -235,19 +235,18 @@ export function SearchSection() {
 
   // Check if we have any live data to show
   const hasLiveData = useMemo(() => {
-    return stories.length > 0 || comments.length > 0 || painPointsIncremental.length > 0 || productIdeas.length > 0;
-  }, [stories.length, comments.length, painPointsIncremental.length, productIdeas.length]);
-
-  // Remove debug logging
-  // console.log("[SearchSection] State:", {
-  //   isLoading,
-  //   phase,
-  //   storiesCount: stories.length,
-  //   commentsCount,
-  //   commentsLength: comments.length,
-  //   painPointsCount: painPointsIncremental.length,
-  //   showLiveFeeds: isLoading && !(searchResults && searchResults.length > 0),
-  // });
+    return (
+      stories.length > 0 ||
+      comments.length > 0 ||
+      painPointsIncremental.length > 0 ||
+      productIdeas.length > 0
+    );
+  }, [
+    stories.length,
+    comments.length,
+    painPointsIncremental.length,
+    productIdeas.length,
+  ]);
 
   // Show live feeds when we have live data OR when loading (for brand new searches)
   // Keep them visible even when final results arrive
@@ -259,6 +258,16 @@ export function SearchSection() {
   const showInitialLoading = useMemo(() => {
     return isLoading && !errorMessage && !hasLiveData;
   }, [isLoading, errorMessage, hasLiveData]);
+
+  const showEmptyState = useMemo(() => {
+    return (
+      phase === "completed" &&
+      !hasLiveData &&
+      !errorMessage &&
+      !isLoading &&
+      query.length >= 2
+    );
+  }, [phase, hasLiveData, errorMessage, isLoading, query.length]);
 
   return (
     <section className="relative pb-8 lg:pb-10">
@@ -313,7 +322,11 @@ export function SearchSection() {
             )}
 
             {/* Phase 2: Live Comments Feed */}
-            {(comments.length > 0 || commentsCount > 0 || phase === "comments" || phase === "analysis" || phase === "completed") && (
+            {(comments.length > 0 ||
+              commentsCount > 0 ||
+              phase === "comments" ||
+              phase === "analysis" ||
+              phase === "completed") && (
               <LiveCommentsFeed
                 comments={comments}
                 commentsCount={commentsCount}
@@ -322,7 +335,10 @@ export function SearchSection() {
             )}
 
             {/* Phase 3: Live Pain Points Feed (AI Analysis) */}
-            {(painPointsIncremental.length > 0 || productIdeas.length > 0 || phase === "analysis" || phase === "completed") && (
+            {(painPointsIncremental.length > 0 ||
+              productIdeas.length > 0 ||
+              phase === "analysis" ||
+              phase === "completed") && (
               <LivePainPointsFeed
                 painPoints={painPointsIncremental}
                 phase={phase}
@@ -332,6 +348,18 @@ export function SearchSection() {
               />
             )}
           </>
+        )}
+
+        {/* Empty state - no stories, comments, or pain points found */}
+        {showEmptyState && (
+          <div className="mt-16 mb-12 flex flex-col items-center justify-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="px-4 py-3 rounded-xl bg-secondary/50 border border-border/60 text-center max-w-md">
+              <p className="text-sm text-muted-foreground">
+                No stories or comments found for this search. Try adjusting your
+                filters or searching for a different topic.
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
