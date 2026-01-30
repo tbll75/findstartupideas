@@ -71,6 +71,7 @@ export async function fetchHNStories(
     url.searchParams.set("query", params.topic);
     url.searchParams.set("page", String(page));
     url.searchParams.set("hitsPerPage", String(HN_HITS_PER_PAGE));
+    url.searchParams.set("typoTolerance", "false");
 
     const tags = mapTags(params.tags);
     if (tags) url.searchParams.set("tags", tags);
