@@ -11,13 +11,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 1,
     },
-    // Add more pages here as the site grows
-    // Example for future pages:
-    // {
-    //   url: `${baseUrl}/about`,
-    //   lastModified: new Date(),
-    //   changeFrequency: "monthly",
-    //   priority: 0.8,
-    // },
+    {
+      url: `${baseUrl}/legal`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
   ];
 }
