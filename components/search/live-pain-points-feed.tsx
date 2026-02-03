@@ -1,11 +1,21 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { Sparkles, TrendingUp, Quote, User, ArrowBigUp, ExternalLink, Share2, Lightbulb, Target } from "lucide-react";
+import {
+  Sparkles,
+  TrendingUp,
+  Quote,
+  User,
+  ArrowBigUp,
+  ExternalLink,
+  Share2,
+  Lightbulb,
+  Target,
+} from "lucide-react";
 import type { SearchResultItem, ProductIdea } from "@/types";
 import { getHNTagLabel } from "./utils/transform-results";
-import { ShareToolbar } from "./ShareToolbar";
-import { ShareModal } from "./ShareModal";
+import { ShareToolbar } from "./share-toolbar";
+import { ShareModal } from "./share-modal";
 
 interface LivePainPointsFeedProps {
   painPoints: SearchResultItem[];
@@ -34,7 +44,9 @@ export function LivePainPointsFeed({
 
   // State for individual pain point sharing
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [selectedPainPointIndex, setSelectedPainPointIndex] = useState<number | undefined>(undefined);
+  const [selectedPainPointIndex, setSelectedPainPointIndex] = useState<
+    number | undefined
+  >(undefined);
 
   // Handle individual pain point share
   const handleSharePainPoint = useCallback((index: number) => {
@@ -43,10 +55,13 @@ export function LivePainPointsFeed({
   }, []);
 
   // Don't render if no pain points, no product ideas, and not in analysis phase
-  if (!painPoints.length && !productIdeas.length && phase !== "analysis") return null;
+  if (!painPoints.length && !productIdeas.length && phase !== "analysis")
+    return null;
 
   // Show share toolbar when we have pain points with quotes or product ideas (completed or analysis phase with data)
-  const showShareToolbar = (displayPainPoints.length > 0 || productIdeas.length > 0) && (phase === "completed" || phase === "analysis");
+  const showShareToolbar =
+    (displayPainPoints.length > 0 || productIdeas.length > 0) &&
+    (phase === "completed" || phase === "analysis");
 
   return (
     <div className="mt-8 space-y-6">
@@ -66,7 +81,9 @@ export function LivePainPointsFeed({
               )}
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-foreground">AI Analysis</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                AI Analysis
+              </h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Identified{" "}
                 <span className="text-purple-600 dark:text-purple-400 font-semibold tabular-nums">
@@ -126,7 +143,9 @@ export function LivePainPointsFeed({
         <div className="space-y-4">
           {displayPainPoints.map((painPoint, index) => (
             <PainPointItem
-              key={`${(painPoint as any).__painPointId || painPoint.id}-${index}`}
+              key={`${
+                (painPoint as any).__painPointId || painPoint.id
+              }-${index}`}
               painPoint={painPoint}
               index={index}
               onShare={() => handleSharePainPoint(index)}
@@ -147,36 +166,42 @@ export function LivePainPointsFeed({
           </div>
           <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
             {productIdeas.map((idea, index) => (
-              <ProductIdeaCard key={`${idea.title}-${index}`} idea={idea} index={index} />
+              <ProductIdeaCard
+                key={`${idea.title}-${index}`}
+                idea={idea}
+                index={index}
+              />
             ))}
           </div>
         </div>
       )}
 
       {/* Processing indicator when no pain points visible yet */}
-      {displayPainPoints.length === 0 && productIdeas.length === 0 && phase === "analysis" && (
-        <div className="flex items-center justify-center py-8">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/50 border border-border/60">
-            <div className="flex gap-1.5">
-              <div
-                className="w-2 h-2 rounded-full bg-purple-600 animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              />
-              <div
-                className="w-2 h-2 rounded-full bg-purple-600 animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              />
-              <div
-                className="w-2 h-2 rounded-full bg-purple-600 animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              />
+      {displayPainPoints.length === 0 &&
+        productIdeas.length === 0 &&
+        phase === "analysis" && (
+          <div className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/50 border border-border/60">
+              <div className="flex gap-1.5">
+                <div
+                  className="w-2 h-2 rounded-full bg-purple-600 animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <div
+                  className="w-2 h-2 rounded-full bg-purple-600 animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <div
+                  className="w-2 h-2 rounded-full bg-purple-600 animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                />
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Clustering pain points...
+              </span>
             </div>
-            <span className="text-sm text-muted-foreground">
-              Clustering pain points...
-            </span>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Individual Pain Point Share Modal */}
       <ShareModal
@@ -239,7 +264,11 @@ function PainPointItem({
               <div className="flex items-center gap-3 ml-11">
                 {/* HN Tag Badge */}
                 <span className="text-xs flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#ff6600]/10 text-[#ff6600] font-medium border border-[#ff6600]/20">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <svg
+                    className="w-3.5 h-3.5"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
                     <path d="M0 24V0h24v24H0zM11.97 12.53L7.22 3.64H5.25l5.76 10.75v6.97h2.09v-6.97L18.86 3.64h-1.97l-4.92 8.89z" />
                   </svg>
                   {getHNTagLabel(painPoint.tag)}
@@ -248,7 +277,9 @@ function PainPointItem({
                 {/* Mentions count */}
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <TrendingUp className="w-3.5 h-3.5" />
-                  <span className="font-semibold tabular-nums">{painPoint.mentions}</span>{" "}
+                  <span className="font-semibold tabular-nums">
+                    {painPoint.mentions}
+                  </span>{" "}
                   {painPoint.mentions === 1 ? "mention" : "mentions"}
                 </span>
               </div>
@@ -277,7 +308,11 @@ function PainPointItem({
               </div>
 
               {painPoint.quotes.map((quote, qIndex) => (
-                <QuoteCard key={`${quote.text.slice(0, 20)}-${qIndex}`} quote={quote} index={qIndex} />
+                <QuoteCard
+                  key={`${quote.text.slice(0, 20)}-${qIndex}`}
+                  quote={quote}
+                  index={qIndex}
+                />
               ))}
             </div>
           )}
@@ -311,7 +346,13 @@ function PainPointItem({
 /**
  * Product idea card
  */
-function ProductIdeaCard({ idea, index }: { idea: ProductIdea; index: number }) {
+function ProductIdeaCard({
+  idea,
+  index,
+}: {
+  idea: ProductIdea;
+  index: number;
+}) {
   return (
     <div
       className="group relative animate-reveal-up rounded-2xl bg-card border border-border/60 overflow-hidden transition-all duration-300 hover:border-amber-500/30 hover:shadow-elevation-3 hover:-translate-y-0.5"
@@ -338,7 +379,10 @@ function ProductIdeaCard({ idea, index }: { idea: ProductIdea; index: number }) 
         <div className="flex items-center gap-2 ml-11">
           <Target className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">
-            Addresses: <span className="font-medium text-foreground/80">{idea.targetProblem}</span>
+            Addresses:{" "}
+            <span className="font-medium text-foreground/80">
+              {idea.targetProblem}
+            </span>
           </span>
         </div>
         <div className="mt-3 ml-11 flex items-center gap-2">
@@ -354,7 +398,13 @@ function ProductIdeaCard({ idea, index }: { idea: ProductIdea; index: number }) 
 /**
  * Individual quote card
  */
-function QuoteCard({ quote, index }: { quote: SearchResultItem["quotes"][0]; index: number }) {
+function QuoteCard({
+  quote,
+  index,
+}: {
+  quote: SearchResultItem["quotes"][0];
+  index: number;
+}) {
   return (
     <div
       className="animate-reveal-up"
@@ -385,7 +435,9 @@ function QuoteCard({ quote, index }: { quote: SearchResultItem["quotes"][0]; ind
             {quote.upvotes > 0 && (
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-secondary/50">
                 <ArrowBigUp className="w-3 h-3" />
-                <span className="font-semibold tabular-nums">{quote.upvotes}</span>
+                <span className="font-semibold tabular-nums">
+                  {quote.upvotes}
+                </span>
               </div>
             )}
           </div>

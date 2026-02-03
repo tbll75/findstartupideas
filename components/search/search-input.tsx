@@ -143,21 +143,6 @@ export function SearchInput({
           </Button>
         </div>
       </div>
-
-      {/* Suggestions dropdown */}
-      {/* {showSuggestions && filteredSuggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-card rounded-xl border border-border shadow-lg z-50">
-          {filteredSuggestions.map((suggestion) => (
-            <button
-              key={suggestion}
-              onClick={() => handleSuggestionClick(suggestion)}
-              className="w-full px-4 py-3 text-left text-sm hover:bg-secondary/50 first:rounded-t-xl last:rounded-b-xl transition-colors"
-            >
-              {suggestion}
-            </button>
-          ))}
-        </div>
-      )} */}
     </div>
   );
 }

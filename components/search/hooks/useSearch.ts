@@ -3,13 +3,13 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { SearchResult, SearchResultItem, ProductIdea } from "@/types";
 import { transformSearchResult } from "../utils/transform-results";
-import { CLIENT_POLL_INTERVAL_MS, CLIENT_MAX_POLL_ATTEMPTS } from "@/shared/constants";
+import {
+  CLIENT_POLL_INTERVAL_MS,
+  CLIENT_MAX_POLL_ATTEMPTS,
+} from "@/shared/constants";
 import { supabaseBrowserClient } from "@/lib/supabase-browser";
 
-// ============================================================================
 // Types
-// ============================================================================
-
 export interface SearchState {
   isLoading: boolean;
   isPolling: boolean;
@@ -53,16 +53,15 @@ export interface SearchParams {
   sortBy: string;
 }
 
-// ============================================================================
 // Hook Implementation
-// ============================================================================
-
 export function useSearch(): SearchState & SearchActions {
   // Core state
   const [isLoading, setIsLoading] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [searchId, setSearchId] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<SearchResultItem[] | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResultItem[] | null>(
+    null
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -71,13 +70,19 @@ export function useSearch(): SearchState & SearchActions {
   const [stories, setStories] = useState<SearchState["stories"]>([]);
   const [commentsCount, setCommentsCount] = useState(0);
   const [comments, setComments] = useState<SearchState["comments"]>([]);
-  const [painPointsIncremental, setPainPointsIncremental] = useState<SearchResultItem[]>([]);
-  const [liveAnalysisSummary, setLiveAnalysisSummary] = useState<string | null>(null);
+  const [painPointsIncremental, setPainPointsIncremental] = useState<
+    SearchResultItem[]
+  >([]);
+  const [liveAnalysisSummary, setLiveAnalysisSummary] = useState<string | null>(
+    null
+  );
   const [productIdeas, setProductIdeas] = useState<ProductIdea[]>([]);
 
   // Refs for cleanup and deduplication
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const realtimeChannelRef = useRef<ReturnType<typeof supabaseBrowserClient.channel> | null>(null);
+  const realtimeChannelRef = useRef<ReturnType<
+    typeof supabaseBrowserClient.channel
+  > | null>(null);
   const currentSearchIdRef = useRef<string | null>(null);
   const painPointIndexRef = useRef<Record<string, number>>({});
   const seenStoryIdsRef = useRef<Set<string>>(new Set());
@@ -114,7 +119,10 @@ export function useSearch(): SearchState & SearchActions {
       eventId: string,
       evt: {
         phase: "stories" | "comments" | "analysis";
-        event_type: "story_discovered" | "comment_discovered" | "phase_progress";
+        event_type:
+          | "story_discovered"
+          | "comment_discovered"
+          | "phase_progress";
         payload: any;
       }
     ) => {
@@ -127,14 +135,17 @@ export function useSearch(): SearchState & SearchActions {
       // Handle story_discovered events
       if (evt.phase === "stories" && evt.event_type === "story_discovered") {
         const storyId = String(evt.payload.id);
-        
+
         // Skip duplicate stories
         if (seenStoryIdsRef.current.has(storyId)) {
           return;
         }
         seenStoryIdsRef.current.add(storyId);
 
-        console.log("[Realtime] Story discovered:", evt.payload.title?.slice(0, 50));
+        console.log(
+          "[Realtime] Story discovered:",
+          evt.payload.title?.slice(0, 50)
+        );
         setPhase((prev) => (prev === "idle" ? "stories" : prev));
         setStories((prev) => {
           // Double-check for duplicates in state
@@ -164,9 +175,10 @@ export function useSearch(): SearchState & SearchActions {
           totalCommentsSoFar: evt.payload.totalCommentsSoFar,
           commentsInPayload: evt.payload.comments?.length ?? 0,
         });
-        
+
         setPhase((prev) => {
-          const newPhase = prev === "idle" || prev === "stories" ? "comments" : prev;
+          const newPhase =
+            prev === "idle" || prev === "stories" ? "comments" : prev;
           console.log("[Realtime] Phase transition:", prev, "->", newPhase);
           return newPhase;
         });
@@ -178,10 +190,10 @@ export function useSearch(): SearchState & SearchActions {
         if (Array.isArray(evt.payload.comments)) {
           setComments((prev) => {
             // Create a Set of existing comment IDs from state for deduplication
-            const existingIds = new Set(prev.map(c => c.id));
+            const existingIds = new Set(prev.map((c) => c.id));
             const next = [...prev];
             let addedCount = 0;
-            
+
             for (const c of evt.payload.comments) {
               if (!c || !c.id) continue;
               const commentId = String(c.id);
@@ -197,7 +209,12 @@ export function useSearch(): SearchState & SearchActions {
                 permalink: c.permalink ?? undefined,
               });
             }
-            console.log("[Realtime] Added", addedCount, "new comments, total:", next.length);
+            console.log(
+              "[Realtime] Added",
+              addedCount,
+              "new comments, total:",
+              next.length
+            );
             // Keep latest 100 comments
             return next.slice(-100);
           });
@@ -240,7 +257,7 @@ export function useSearch(): SearchState & SearchActions {
         }
 
         console.log("[Realtime] Backfilling", events.length, "events");
-        
+
         // Count events by type for debugging
         const eventCounts = events.reduce((acc, e) => {
           const key = `${e.phase}:${e.event_type}`;
@@ -255,7 +272,10 @@ export function useSearch(): SearchState & SearchActions {
 
           processSearchEvent(event.id, {
             phase: event.phase as "stories" | "comments" | "analysis",
-            event_type: event.event_type as "story_discovered" | "comment_discovered" | "phase_progress",
+            event_type: event.event_type as
+              | "story_discovered"
+              | "comment_discovered"
+              | "phase_progress",
             payload: event.payload,
           });
         }
@@ -297,7 +317,8 @@ export function useSearch(): SearchState & SearchActions {
     });
 
     // Build pain points with quotes
-    const incrementalItems: (SearchResultItem & { __painPointId: string })[] = [];
+    const incrementalItems: (SearchResultItem & { __painPointId: string })[] =
+      [];
     const newPainPointIndex: Record<string, number> = {};
 
     result.painPoints.forEach((pp, index) => {
@@ -326,7 +347,10 @@ export function useSearch(): SearchState & SearchActions {
     }
 
     // Set product ideas if available
-    if (Array.isArray(result.analysis?.productIdeas) && result.analysis.productIdeas.length > 0) {
+    if (
+      Array.isArray(result.analysis?.productIdeas) &&
+      result.analysis.productIdeas.length > 0
+    ) {
       setProductIdeas(result.analysis.productIdeas);
     }
   }, []);
@@ -350,7 +374,9 @@ export function useSearch(): SearchState & SearchActions {
       const painPointIds = painPoints.map((pp) => pp.id);
       const { data: quotes } = await supabaseBrowserClient
         .from("pain_point_quotes")
-        .select("id, pain_point_id, quote_text, author_handle, upvotes, permalink")
+        .select(
+          "id, pain_point_id, quote_text, author_handle, upvotes, permalink"
+        )
         .in("pain_point_id", painPointIds);
 
       // Group quotes by pain point
@@ -362,7 +388,8 @@ export function useSearch(): SearchState & SearchActions {
       }
 
       // Build incremental pain points
-      const incrementalItems: (SearchResultItem & { __painPointId: string })[] = [];
+      const incrementalItems: (SearchResultItem & { __painPointId: string })[] =
+        [];
       const newPainPointIndex: Record<string, number> = {};
 
       painPoints.forEach((pp, index) => {
@@ -400,14 +427,18 @@ export function useSearch(): SearchState & SearchActions {
       if (analysis?.summary) {
         setLiveAnalysisSummary(analysis.summary);
       }
-      if (Array.isArray(analysis?.product_ideas) && analysis.product_ideas.length > 0) {
+      if (
+        Array.isArray(analysis?.product_ideas) &&
+        analysis.product_ideas.length > 0
+      ) {
         const validIdeas = (analysis.product_ideas as unknown[]).filter(
           (item): item is ProductIdea =>
             item !== null &&
             typeof item === "object" &&
             typeof (item as Record<string, unknown>).title === "string" &&
             typeof (item as Record<string, unknown>).description === "string" &&
-            typeof (item as Record<string, unknown>).targetProblem === "string" &&
+            typeof (item as Record<string, unknown>).targetProblem ===
+              "string" &&
             typeof (item as Record<string, unknown>).impactScore === "number"
         );
         setProductIdeas(validIdeas);
@@ -448,11 +479,18 @@ export function useSearch(): SearchState & SearchActions {
           const event = payload.new as {
             id: string;
             phase: "stories" | "comments" | "analysis";
-            event_type: "story_discovered" | "comment_discovered" | "phase_progress";
+            event_type:
+              | "story_discovered"
+              | "comment_discovered"
+              | "phase_progress";
             payload: any;
           };
 
-          console.log("[Realtime] Received event:", event.phase, event.event_type);
+          console.log(
+            "[Realtime] Received event:",
+            event.phase,
+            event.event_type
+          );
 
           processSearchEvent(event.id, {
             phase: event.phase,
@@ -560,11 +598,18 @@ export function useSearch(): SearchState & SearchActions {
             if (!prev[idx]) return prev;
             const next = [...prev];
             const target: any = next[idx];
-            const existingQuotes: SearchResultItem["quotes"] =
-              Array.isArray(target.quotes) ? target.quotes : [];
+            const existingQuotes: SearchResultItem["quotes"] = Array.isArray(
+              target.quotes
+            )
+              ? target.quotes
+              : [];
 
             // Avoid duplicates
-            if (existingQuotes.some((q) => q.text === quote.text && q.author === quote.author)) {
+            if (
+              existingQuotes.some(
+                (q) => q.text === quote.text && q.author === quote.author
+              )
+            ) {
               return prev;
             }
 
@@ -586,17 +631,26 @@ export function useSearch(): SearchState & SearchActions {
         },
         (payload) => {
           if (!payload.new || currentSearchIdRef.current !== id) return;
-          const row = payload.new as { summary: string; product_ideas?: unknown[] };
+          const row = payload.new as {
+            summary: string;
+            product_ideas?: unknown[];
+          };
           setLiveAnalysisSummary(row.summary);
-          if (Array.isArray(row.product_ideas) && row.product_ideas.length > 0) {
+          if (
+            Array.isArray(row.product_ideas) &&
+            row.product_ideas.length > 0
+          ) {
             const validIdeas = row.product_ideas.filter(
               (item): item is ProductIdea =>
                 item !== null &&
                 typeof item === "object" &&
                 typeof (item as Record<string, unknown>).title === "string" &&
-                typeof (item as Record<string, unknown>).description === "string" &&
-                typeof (item as Record<string, unknown>).targetProblem === "string" &&
-                typeof (item as Record<string, unknown>).impactScore === "number"
+                typeof (item as Record<string, unknown>).description ===
+                  "string" &&
+                typeof (item as Record<string, unknown>).targetProblem ===
+                  "string" &&
+                typeof (item as Record<string, unknown>).impactScore ===
+                  "number"
             );
             setProductIdeas(validIdeas);
           }
@@ -610,7 +664,11 @@ export function useSearch(): SearchState & SearchActions {
           // Backfill any events we might have missed
           backfillMissedEvents(id);
           bumpProgress(2, 20);
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        } else if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
           console.error("[Realtime] Channel error:", status);
           isSubscribedRef.current = false;
         }
@@ -618,7 +676,12 @@ export function useSearch(): SearchState & SearchActions {
 
       realtimeChannelRef.current = channel;
     },
-    [bumpProgress, cleanupRealtimeChannel, processSearchEvent, backfillMissedEvents]
+    [
+      bumpProgress,
+      cleanupRealtimeChannel,
+      processSearchEvent,
+      backfillMissedEvents,
+    ]
   );
 
   /**
@@ -638,7 +701,9 @@ export function useSearch(): SearchState & SearchActions {
             pollingIntervalRef.current = null;
           }
           setIsPolling(false);
-          setErrorMessage("Search is taking longer than expected. Please refresh the page later.");
+          setErrorMessage(
+            "Search is taking longer than expected. Please refresh the page later."
+          );
           setIsLoading(false);
           setLoadingProgress(0);
           setPhase("failed");
@@ -688,20 +753,28 @@ export function useSearch(): SearchState & SearchActions {
             setIsPolling(false);
             setIsLoading(false);
             setLoadingProgress(0);
-            setErrorMessage(data.errorMessage || "Search failed. Please try again.");
+            setErrorMessage(
+              data.errorMessage || "Search failed. Please try again."
+            );
             setPhase("failed");
             return;
           }
 
           // Still processing, poll again
           if (data.status === "processing" || data.status === "pending") {
-            pollingIntervalRef.current = setTimeout(poll, CLIENT_POLL_INTERVAL_MS);
+            pollingIntervalRef.current = setTimeout(
+              poll,
+              CLIENT_POLL_INTERVAL_MS
+            );
           }
         } catch (error) {
           console.error("Error polling search status:", error);
           // Don't fail immediately on network error, retry
           if (attempts < maxAttempts) {
-            pollingIntervalRef.current = setTimeout(poll, CLIENT_POLL_INTERVAL_MS);
+            pollingIntervalRef.current = setTimeout(
+              poll,
+              CLIENT_POLL_INTERVAL_MS
+            );
           } else {
             if (pollingIntervalRef.current) {
               clearTimeout(pollingIntervalRef.current);
@@ -767,7 +840,8 @@ export function useSearch(): SearchState & SearchActions {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
-          const message = errorData?.error || "Something went wrong starting your search.";
+          const message =
+            errorData?.error || "Something went wrong starting your search.";
           setErrorMessage(message);
           setIsLoading(false);
           setLoadingProgress(0);
@@ -818,7 +892,9 @@ export function useSearch(): SearchState & SearchActions {
         } else if (status === "failed") {
           setIsLoading(false);
           setLoadingProgress(0);
-          setErrorMessage(data.errorMessage || "Search failed. Please try again.");
+          setErrorMessage(
+            data.errorMessage || "Search failed. Please try again."
+          );
           setPhase("failed");
         }
       } catch (error) {
@@ -829,7 +905,12 @@ export function useSearch(): SearchState & SearchActions {
         setPhase("failed");
       }
     },
-    [pollSearchStatus, startRealtimeSubscriptions, cleanupRealtimeChannel, clearIncrementalState]
+    [
+      pollSearchStatus,
+      startRealtimeSubscriptions,
+      cleanupRealtimeChannel,
+      clearIncrementalState,
+    ]
   );
 
   /**

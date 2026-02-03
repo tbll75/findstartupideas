@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Sparkles, Users, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SearchResultItem } from "@/types";
-import { PainPointCard } from "./PainPointCard";
+import { PainPointCard } from "./pain-point-card";
 
 interface SearchResultsProps {
   results: SearchResultItem[];

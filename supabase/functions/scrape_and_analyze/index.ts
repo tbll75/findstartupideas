@@ -61,9 +61,7 @@ import { logJob } from "./db/logging.ts";
 // Redis
 import { cacheSearchResult } from "./redis/client.ts";
 
-// ============================================================================
 // Constants
-// ============================================================================
 
 /** Batch size for emitting story events (to avoid overwhelming Realtime) */
 const STORY_EVENT_BATCH_SIZE = 10;
@@ -71,10 +69,7 @@ const STORY_EVENT_BATCH_SIZE = 10;
 /** Delay between story event batches (ms) */
 const STORY_EVENT_BATCH_DELAY_MS = 100;
 
-// ============================================================================
 // Main Handler
-// ============================================================================
-
 serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
@@ -157,9 +152,7 @@ serve(async (req) => {
       minUpvotes: search.min_upvotes ?? 0,
     };
 
-    // =========================================================================
     // STEP 1: Fetch HN stories
-    // =========================================================================
     console.log(`[${searchId}] Fetching HN stories...`);
     const stories = await withRetry(
       () => fetchHNStories(hnParams, abortController.signal),
@@ -175,7 +168,7 @@ serve(async (req) => {
     // This gives the client time to subscribe and receive events
     for (let i = 0; i < limitedStories.length; i += STORY_EVENT_BATCH_SIZE) {
       const batch = limitedStories.slice(i, i + STORY_EVENT_BATCH_SIZE);
-      
+
       try {
         await insertSearchEvents(
           supabase,
@@ -203,9 +196,7 @@ serve(async (req) => {
       }
     }
 
-    // =========================================================================
     // STEP 2: Fetch comments for top stories
-    // =========================================================================
     const comments = new Map<string, HNComment[]>();
     const storiesToFetchComments = limitedStories.slice(
       0,
@@ -280,11 +271,9 @@ serve(async (req) => {
 
     console.log(`[${searchId}] Total comments: ${totalComments}`);
 
-    // =========================================================================
     // STEP 3: Call Gemini for analysis
-    // =========================================================================
     console.log(`[${searchId}] Calling Gemini...`);
-    
+
     // Emit analysis phase start event
     try {
       await insertSearchEvents(supabase, [
@@ -334,9 +323,7 @@ serve(async (req) => {
       );
     }
 
-    // =========================================================================
     // STEP 4: Store search_results metadata
-    // =========================================================================
     const totalMentions = totalComments;
 
     const searchResultsRow = await insertSearchResults(supabase, {
@@ -352,9 +339,7 @@ serve(async (req) => {
       throw new Error("Failed to insert search_results");
     }
 
-    // =========================================================================
     // STEP 5: Store pain points from Gemini analysis
-    // =========================================================================
     const painPoints: PainPointRow[] = [];
     const sortedTags = getSortedTags(limitedStories);
     const defaultTag = sortedTags.length > 0 ? sortedTags[0] : "story";
@@ -410,9 +395,7 @@ serve(async (req) => {
     // Reload persisted pain points
     const persistedPainPoints = await getPainPoints(supabase, searchId);
 
-    // =========================================================================
     // STEP 6: Store quotes from Gemini examples
-    // =========================================================================
     const quotes: PainPointQuoteRow[] = [];
 
     if (analysis && Array.isArray(analysis.problemClusters)) {
@@ -505,9 +488,7 @@ serve(async (req) => {
 
     console.log(`[${searchId}] Stored ${quotes.length} quotes`);
 
-    // =========================================================================
     // STEP 7: Store AI analysis
-    // =========================================================================
     let analysisRow = null;
 
     if (analysis && analysis.summary) {
@@ -542,9 +523,7 @@ serve(async (req) => {
       );
     }
 
-    // =========================================================================
     // STEP 8: Assemble payload and cache in Redis
-    // =========================================================================
     const payload: SearchResultPayload = {
       searchId,
       status: "completed",
@@ -650,17 +629,19 @@ serve(async (req) => {
 
     // Use retry logic instead of immediately marking as failed
     // This allows transient failures to be retried automatically
-    await markSearchForRetry(
+    await markSearchForRetry(supabase, searchId!, userFriendlyMessage);
+
+    await logJob(
       supabase,
       searchId!,
-      userFriendlyMessage
+      "error",
+      "scrape_and_analyze job failed",
+      {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        willRetry: true,
+      }
     );
-    
-    await logJob(supabase, searchId!, "error", "scrape_and_analyze job failed", {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-      willRetry: true,
-    });
 
     clearTimeout(timeout);
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE_CONFIG } from "@/constants/branding";
+import { SITE_CONFIG } from "@/constants";
 
 export const metadata: Metadata = {
   title: "Terms of Service",

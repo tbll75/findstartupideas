@@ -1,72 +1,76 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Sparkles, Search, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function HeroSection() {
-  const [mounted, setMounted] = useState(false)
-  const [query, setQuery] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    setMounted(true)
-    // Sync query from URL on mount
-    const urlQuery = searchParams.get("q")
+    setMounted(true);
+    const urlQuery = searchParams.get("q");
     if (urlQuery) {
-      setQuery(urlQuery)
+      setQuery(urlQuery);
     }
-  }, [searchParams])
+  }, [searchParams]);
 
   const handleSearch = useCallback(() => {
-    if (query.length < 2) return
-    
-    const params = new URLSearchParams()
-    params.set("q", query)
-    router.push(`/?${params.toString()}`, { scroll: false })
-  }, [query, router])
+    if (query.length < 2) return;
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch()
-    }
-  }, [handleSearch])
+    const params = new URLSearchParams();
+    params.set("q", query);
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }, [query, router]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        handleSearch();
+      }
+    },
+    [handleSearch]
+  );
 
   return (
     <section className="relative min-h-[60vh] flex items-center pt-20 overflow-hidden">
       {/* Premium layered background */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         {/* Primary gradient dome */}
-        <div 
+        <div
           className="absolute top-[-30%] left-1/2 -translate-x-1/2 w-[160%] max-w-[1800px] aspect-square"
           style={{
-            background: "radial-gradient(ellipse at center, oklch(0.60 0.21 30 / 0.06) 0%, oklch(0.60 0.21 30 / 0.02) 35%, transparent 65%)",
+            background:
+              "radial-gradient(ellipse at center, oklch(0.60 0.21 30 / 0.06) 0%, oklch(0.60 0.21 30 / 0.02) 35%, transparent 65%)",
           }}
         />
-        
+
         {/* Floating ambient orbs */}
-        <div 
+        <div
           className="absolute top-[5%] left-[10%] w-[350px] h-[350px] rounded-full animate-float-slow"
           style={{
-            background: "radial-gradient(circle, oklch(0.88 0.10 55 / 0.25) 0%, transparent 70%)",
+            background:
+              "radial-gradient(circle, oklch(0.88 0.10 55 / 0.25) 0%, transparent 70%)",
             filter: "blur(50px)",
           }}
         />
-        <div 
+        <div
           className="absolute top-[15%] right-[8%] w-[450px] h-[450px] rounded-full animate-float-delayed"
           style={{
-            background: "radial-gradient(circle, oklch(0.78 0.08 75 / 0.18) 0%, transparent 70%)",
+            background:
+              "radial-gradient(circle, oklch(0.78 0.08 75 / 0.18) 0%, transparent 70%)",
             filter: "blur(60px)",
           }}
         />
-        <div 
+        <div
           className="absolute bottom-[15%] left-[15%] w-[280px] h-[280px] rounded-full animate-float"
           style={{
-            background: "radial-gradient(circle, oklch(0.92 0.06 40 / 0.2) 0%, transparent 70%)",
+            background:
+              "radial-gradient(circle, oklch(0.92 0.06 40 / 0.2) 0%, transparent 70%)",
             filter: "blur(40px)",
           }}
         />
@@ -111,7 +115,9 @@ export function HeroSection() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <span className="text-xs font-semibold text-emerald-600">Live</span>
+              <span className="text-xs font-semibold text-emerald-600">
+                Live
+              </span>
             </span>
           </div>
 
@@ -124,22 +130,22 @@ export function HeroSection() {
           >
             <span className="block">Find Startup Ideas</span>
             <span className="relative inline-block mt-1">
-              <span className="relative z-10 text-primary">from Real Pain Points</span>
-              <svg 
+              <span className="relative z-10 text-primary">
+                from Real Pain Points
+              </span>
+              <svg
                 className="absolute -bottom-1 left-0 w-full h-3 text-primary/25 overflow-visible"
-                viewBox="0 0 200 12" 
+                viewBox="0 0 200 12"
                 preserveAspectRatio="none"
                 fill="none"
                 aria-hidden="true"
               >
-                <path 
-                  d="M2 9 Q 50 2, 100 9 T 198 9" 
-                  stroke="currentColor" 
+                <path
+                  d="M2 9 Q 50 2, 100 9 T 198 9"
+                  stroke="currentColor"
                   strokeWidth="3"
                   strokeLinecap="round"
-                  className={cn(
-                    mounted && "animate-draw"
-                  )}
+                  className={cn(mounted && "animate-draw")}
                   style={{ animationDelay: "0.6s" }}
                 />
               </svg>
@@ -157,10 +163,8 @@ export function HeroSection() {
             from Hacker News discussions. AI-powered startup idea discovery in
             seconds.
           </p>
-
-          
         </div>
       </div>
     </section>
-  )
+  );
 }

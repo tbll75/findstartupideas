@@ -1,31 +1,31 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState } from "react"
-import { cn } from "@/lib/utils"
-import { Sparkles, Plus, Minus } from "lucide-react"
-import { faqs } from "@/constants"
+import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Sparkles, Plus, Minus } from "lucide-react";
+import { faqs } from "@/constants";
 
 export function FAQSection() {
-  const [isVisible, setIsVisible] = useState(false)
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const sectionRef = useRef<HTMLElement>(null)
+  const [isVisible, setIsVisible] = useState(false);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true)
+          setIsVisible(true);
         }
       },
       { threshold: 0.1 }
-    )
+    );
 
     if (sectionRef.current) {
-      observer.observe(sectionRef.current)
+      observer.observe(sectionRef.current);
     }
 
-    return () => observer.disconnect()
-  }, [])
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <section
@@ -52,7 +52,8 @@ export function FAQSection() {
             Questions & Answers
           </h2>
           <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-            Everything you need to know about finding startup ideas and how we can help your research.
+            Everything you need to know about finding startup ideas and how we
+            can help your research.
           </p>
         </div>
 
@@ -64,7 +65,7 @@ export function FAQSection() {
           )}
         >
           {faqs.map((faq, index) => {
-            const isOpen = openIndex === index
+            const isOpen = openIndex === index;
             return (
               <div
                 key={index}
@@ -81,18 +82,24 @@ export function FAQSection() {
                   className="cursor-pointer w-full flex items-start justify-between gap-4 p-6 text-left focus-ring rounded-2xl"
                   aria-expanded={isOpen}
                 >
-                  <span className={cn(
-                    "text-base font-semibold leading-relaxed transition-colors duration-200 pr-4",
-                    isOpen ? "text-foreground" : "text-foreground/90 group-hover:text-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-base font-semibold leading-relaxed transition-colors duration-200 pr-4",
+                      isOpen
+                        ? "text-foreground"
+                        : "text-foreground/90 group-hover:text-foreground"
+                    )}
+                  >
                     {faq.question}
                   </span>
-                  <span className={cn(
-                    "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300",
-                    isOpen
-                      ? "bg-foreground text-background"
-                      : "bg-secondary text-foreground group-hover:bg-secondary/80"
-                  )}>
+                  <span
+                    className={cn(
+                      "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-300",
+                      isOpen
+                        ? "bg-foreground text-background"
+                        : "bg-secondary text-foreground group-hover:bg-secondary/80"
+                    )}
+                  >
                     {isOpen ? (
                       <Minus className="w-4 h-4" />
                     ) : (
@@ -103,7 +110,9 @@ export function FAQSection() {
                 <div
                   className={cn(
                     "grid transition-all duration-300",
-                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    isOpen
+                      ? "grid-rows-[1fr] opacity-100"
+                      : "grid-rows-[0fr] opacity-0"
                   )}
                 >
                   <div className="overflow-hidden">
@@ -115,28 +124,10 @@ export function FAQSection() {
                   </div>
                 </div>
               </div>
-            )
+            );
           })}
         </div>
-
-        {/* Contact CTA */}
-        {/* <div
-          className={cn(
-            "mt-14 text-center transition-all duration-700 delay-400",
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          )}
-        >
-          <p className="text-muted-foreground">
-            Still have questions?{" "}
-            <a 
-              href="mailto:hello@reminer.app" 
-              className="text-primary font-semibold hover:underline underline-offset-4 focus-ring rounded"
-            >
-              Get in touch
-            </a>
-          </p>
-        </div> */}
       </div>
     </section>
-  )
+  );
 }

@@ -7,7 +7,9 @@ import { MessageCircle, User, ArrowBigUp, ExternalLink } from "lucide-react";
 function decodeHtmlEntities(str: string): string {
   if (typeof str !== "string" || !str) return str;
   return str
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    )
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
     .replace(/&apos;/g, "'")
     .replace(/&quot;/g, '"')
@@ -41,7 +43,10 @@ export function LiveCommentsFeed({
   phase,
 }: LiveCommentsFeedProps) {
   // Display last 10 comments (most recent)
-  const displayComments = useMemo(() => comments.slice(-10).reverse(), [comments]);
+  const displayComments = useMemo(
+    () => comments.slice(-10).reverse(),
+    [comments]
+  );
 
   // Don't render if no comments and not in comments phase
   if (!comments.length && phase !== "comments") return null;
@@ -131,7 +136,13 @@ export function LiveCommentsFeed({
 /**
  * Individual comment card with animation
  */
-function CommentCard({ comment, index }: { comment: CommentPreview; index: number }) {
+function CommentCard({
+  comment,
+  index,
+}: {
+  comment: CommentPreview;
+  index: number;
+}) {
   return (
     <div
       className="group animate-reveal-up"
@@ -157,7 +168,9 @@ function CommentCard({ comment, index }: { comment: CommentPreview; index: numbe
               {comment.author && (
                 <div className="flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" />
-                  <span className="font-medium">{decodeHtmlEntities(comment.author)}</span>
+                  <span className="font-medium">
+                    {decodeHtmlEntities(comment.author)}
+                  </span>
                 </div>
               )}
 
@@ -165,7 +178,9 @@ function CommentCard({ comment, index }: { comment: CommentPreview; index: numbe
               {typeof comment.upvotes === "number" && comment.upvotes > 0 && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary/50">
                   <ArrowBigUp className="w-3.5 h-3.5" />
-                  <span className="font-semibold tabular-nums">{comment.upvotes}</span>
+                  <span className="font-semibold tabular-nums">
+                    {comment.upvotes}
+                  </span>
                 </div>
               )}
             </div>

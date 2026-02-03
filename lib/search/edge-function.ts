@@ -23,12 +23,8 @@ export async function triggerEdgeFunction(searchId: string): Promise<boolean> {
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/scrape_and_analyze`;
 
   try {
-    // Fire-and-forget: Send the request but don't wait for response
-    // This prevents timeout issues from blocking the API response
     const controller = new AbortController();
-    
-    // Set a short timeout just for the initial connection (5 seconds)
-    // The edge function itself can run much longer
+
     const connectionTimeout = setTimeout(() => controller.abort(), 5000);
 
     fetch(edgeFunctionUrl, {
@@ -50,8 +46,6 @@ export async function triggerEdgeFunction(searchId: string): Promise<boolean> {
       })
       .catch((err) => {
         clearTimeout(connectionTimeout);
-        // Log but don't fail - the edge function may still run
-        // Common reasons: connection timeout, network issues
         if (err.name === "AbortError") {
           console.log(
             `[triggerEdgeFunction] Connection timeout for ${searchId} (edge function may still be running)`
@@ -64,7 +58,6 @@ export async function triggerEdgeFunction(searchId: string): Promise<boolean> {
         }
       });
 
-    // Return immediately - we don't wait for the edge function response
     return true;
   } catch (err) {
     console.error("[triggerEdgeFunction] Failed to invoke edge function", err);

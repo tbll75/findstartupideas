@@ -2,16 +2,16 @@
 
 import { useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearch, useSearchFilters, useSearchGate } from "./hooks";
-import { SearchProgress } from "./SearchProgress";
-import { SearchInput } from "./SearchInput";
-import { SearchFilters } from "./SearchFilters";
-import { SearchLoading } from "./SearchLoading";
-import { SearchError } from "./SearchError";
-import { LiveStoriesFeed } from "./LiveStoriesFeed";
-import { LiveCommentsFeed } from "./LiveCommentsFeed";
-import { LivePainPointsFeed } from "./LivePainPointsFeed";
-import { ExampleSearchBadges } from "./ExampleSearchBadges";
-import { EmailGateModal } from "./EmailGateModal";
+import { SearchProgress } from "./search-progress";
+import { SearchInput } from "./search-input";
+import { SearchFilters } from "./search-filters";
+import { SearchLoading } from "./search-loading";
+import { SearchError } from "./search-error";
+import { LiveStoriesFeed } from "./live-stories-feed";
+import { LiveCommentsFeed } from "./live-comments-feed";
+import { LivePainPointsFeed } from "./live-pain-points-feed";
+import { ExampleSearchBadges } from "./example-search-badges";
+import { EmailGateModal } from "./email-gate-modal";
 
 /**
  * Main search section component

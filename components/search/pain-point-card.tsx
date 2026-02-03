@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { MessageSquare } from "lucide-react";
 import type { SearchResultItem } from "@/types";
-import { QuoteItem } from "./QuoteItem";
+import { QuoteItem } from "./quote-item";
 import { getHNTagLabel } from "./utils/transform-results";
 
 interface PainPointCardProps {

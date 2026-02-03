@@ -1,41 +1,40 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState } from "react"
-import { Quote, Sparkles, Search, ArrowRight } from "lucide-react"
-import { cn } from "@/lib/utils"
-import Link from "next/link"
-import { testimonials } from "@/constants"
+import { useEffect, useRef, useState } from "react";
+import { Quote, Sparkles, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { testimonials } from "@/constants";
 
 export function TestimonialsSection() {
-  const [isVisible, setIsVisible] = useState(false)
-  const [activeCard, setActiveCard] = useState(0)
-  const sectionRef = useRef<HTMLElement>(null)
+  const [isVisible, setIsVisible] = useState(false);
+  const [activeCard, setActiveCard] = useState(0);
+  const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true)
+          setIsVisible(true);
         }
       },
       { threshold: 0.1 }
-    )
+    );
 
     if (sectionRef.current) {
-      observer.observe(sectionRef.current)
+      observer.observe(sectionRef.current);
     }
 
-    return () => observer.disconnect()
-  }, [])
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!isVisible) return
-    
+    if (!isVisible) return;
+
     const interval = setInterval(() => {
-      setActiveCard((prev) => (prev + 1) % testimonials.length)
-    }, 6000)
-    return () => clearInterval(interval)
-  }, [isVisible])
+      setActiveCard((prev) => (prev + 1) % testimonials.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [isVisible]);
 
   return (
     <section
@@ -48,10 +47,11 @@ export function TestimonialsSection() {
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
       {/* Decorative orb */}
-      <div 
+      <div
         className="absolute top-[20%] left-[3%] w-[400px] h-[400px] rounded-full opacity-20 animate-float-slow pointer-events-none"
         style={{
-          background: "radial-gradient(circle, oklch(0.60 0.21 30 / 0.08) 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, oklch(0.60 0.21 30 / 0.08) 0%, transparent 70%)",
           filter: "blur(60px)",
         }}
         aria-hidden="true"
@@ -75,7 +75,8 @@ export function TestimonialsSection() {
             <span className="text-muted-foreground">real opportunities</span>
           </h2>
           <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-            See what others have found using Find Startup Ideas to validate ideas and discover market gaps.
+            See what others have found using Find Startup Ideas to validate
+            ideas and discover market gaps.
           </p>
         </div>
 
@@ -87,8 +88,8 @@ export function TestimonialsSection() {
           )}
         >
           {testimonials.map((testimonial, index) => {
-            const Icon = testimonial.icon
-            const isActive = activeCard === index
+            const Icon = testimonial.icon;
+            const isActive = activeCard === index;
             return (
               <div
                 key={index}
@@ -112,10 +113,12 @@ export function TestimonialsSection() {
 
                 <div className="relative z-10 p-8 lg:p-9">
                   {/* Quote icon */}
-                  <Quote className={cn(
-                    "absolute top-6 right-6 w-9 h-9 transition-colors duration-400",
-                    isActive ? "text-primary/15" : "text-border"
-                  )} />
+                  <Quote
+                    className={cn(
+                      "absolute top-6 right-6 w-9 h-9 transition-colors duration-400",
+                      isActive ? "text-primary/15" : "text-border"
+                    )}
+                  />
 
                   {/* Icon badge */}
                   <div
@@ -136,11 +139,18 @@ export function TestimonialsSection() {
                   {/* Author */}
                   <div className="flex items-center gap-3 mb-5">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-muted flex items-center justify-center text-xs font-bold text-foreground/80">
-                      {testimonial.author.split(" ").map(n => n[0]).join("")}
+                      {testimonial.author
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{testimonial.author}</p>
-                      <p className="text-xs text-muted-foreground">{testimonial.role}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {testimonial.author}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {testimonial.role}
+                      </p>
                     </div>
                   </div>
 
@@ -150,20 +160,24 @@ export function TestimonialsSection() {
                   </p>
 
                   {/* Search example */}
-                  <div className={cn(
-                    "rounded-2xl p-4 mb-4 transition-colors duration-300",
-                    isActive ? "bg-secondary/70" : "bg-secondary/40"
-                  )}>
+                  <div
+                    className={cn(
+                      "rounded-2xl p-4 mb-4 transition-colors duration-300",
+                      isActive ? "bg-secondary/70" : "bg-secondary/40"
+                    )}
+                  >
                     <div className="flex items-center gap-2 mb-2.5">
                       <Search className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         Search term
                       </span>
                     </div>
-                    <code className={cn(
-                      "inline-block px-2.5 py-1 rounded-lg text-sm font-mono font-medium border",
-                      "bg-card text-foreground border-border/40"
-                    )}>
+                    <code
+                      className={cn(
+                        "inline-block px-2.5 py-1 rounded-lg text-sm font-mono font-medium border",
+                        "bg-card text-foreground border-border/40"
+                      )}
+                    >
                       {testimonial.searchTerm}
                     </code>
                   </div>
@@ -175,20 +189,19 @@ export function TestimonialsSection() {
                         key={i}
                         className="flex items-center gap-2.5 text-sm text-muted-foreground"
                       >
-                        <span className={cn(
-                          "w-1.5 h-1.5 rounded-full transition-colors duration-300",
-                          isActive ? "bg-primary" : "bg-border"
-                        )} />
+                        <span
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full transition-colors duration-300",
+                            isActive ? "bg-primary" : "bg-border"
+                          )}
+                        />
                         {discovery}
                       </div>
                     ))}
                   </div>
-
-                  {/* CTA */}
-                  
                 </div>
               </div>
-            )
+            );
           })}
         </div>
 
@@ -201,8 +214,8 @@ export function TestimonialsSection() {
               onClick={() => setActiveCard(index)}
               className={cn(
                 "h-1.5 rounded-full transition-all duration-400",
-                activeCard === index 
-                  ? `w-10 bg-gradient-to-r ${testimonial.gradient}` 
+                activeCard === index
+                  ? `w-10 bg-gradient-to-r ${testimonial.gradient}`
                   : "w-1.5 bg-border hover:bg-muted-foreground/30"
               )}
               aria-label={`View testimonial ${index + 1}`}
@@ -211,5 +224,5 @@ export function TestimonialsSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

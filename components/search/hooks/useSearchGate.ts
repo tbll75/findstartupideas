@@ -35,7 +35,7 @@ export interface SearchGateActions {
 
 /**
  * Hook for managing search gate (email wall after N free searches)
- * 
+ *
  * Features:
  * - Tracks search count in localStorage
  * - Persists subscription status

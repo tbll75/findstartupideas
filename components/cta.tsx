@@ -1,43 +1,42 @@
-"use client"
+"use client";
 
-import React from "react"
-import { useEffect, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ArrowRight, Sparkles } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { features } from "@/constants"
-import { SITE_CONFIG } from "@/constants/branding"
+import React from "react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { features, SITE_CONFIG } from "@/constants";
 
 export function CTASection() {
-  const [isVisible, setIsVisible] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 })
-  const sectionRef = useRef<HTMLElement>(null)
+  const [isVisible, setIsVisible] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
+  const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setIsVisible(true)
+          setIsVisible(true);
         }
       },
       { threshold: 0.2 }
-    )
+    );
 
     if (sectionRef.current) {
-      observer.observe(sectionRef.current)
+      observer.observe(sectionRef.current);
     }
 
-    return () => observer.disconnect()
-  }, [])
+    return () => observer.disconnect();
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!sectionRef.current) return
-    const rect = sectionRef.current.getBoundingClientRect()
+    if (!sectionRef.current) return;
+    const rect = sectionRef.current.getBoundingClientRect();
     setMousePosition({
       x: ((e.clientX - rect.left) / rect.width) * 100,
       y: ((e.clientY - rect.top) / rect.height) * 100,
-    })
-  }
+    });
+  };
 
   return (
     <section
@@ -47,9 +46,9 @@ export function CTASection() {
     >
       {/* Dark background */}
       <div className="absolute inset-0 bg-foreground" />
-      
+
       {/* Interactive spotlight */}
-      <div 
+      <div
         className="absolute inset-0 opacity-30 transition-opacity duration-500 pointer-events-none"
         style={{
           background: `radial-gradient(700px circle at ${mousePosition.x}% ${mousePosition.y}%, oklch(0.60 0.21 30 / 0.12), transparent 45%)`,
@@ -58,23 +57,25 @@ export function CTASection() {
       />
 
       {/* Floating orbs */}
-      <div 
+      <div
         className="absolute top-[-5%] left-1/4 w-[500px] h-[500px] rounded-full animate-float-slow pointer-events-none"
         style={{
-          background: "radial-gradient(circle, oklch(0.60 0.21 30 / 0.15) 0%, transparent 60%)",
+          background:
+            "radial-gradient(circle, oklch(0.60 0.21 30 / 0.15) 0%, transparent 60%)",
           filter: "blur(80px)",
         }}
         aria-hidden="true"
       />
-      <div 
+      <div
         className="absolute bottom-[-5%] right-1/4 w-[400px] h-[400px] rounded-full animate-float-delayed pointer-events-none"
         style={{
-          background: "radial-gradient(circle, oklch(0.60 0.21 30 / 0.12) 0%, transparent 60%)",
+          background:
+            "radial-gradient(circle, oklch(0.60 0.21 30 / 0.12) 0%, transparent 60%)",
           filter: "blur(60px)",
         }}
         aria-hidden="true"
       />
-      
+
       {/* Dot pattern */}
       <div
         className="absolute inset-0 opacity-[0.025] pointer-events-none"
@@ -107,16 +108,16 @@ export function CTASection() {
             <br />
             <span className="relative inline-block">
               users really want?
-              <svg 
+              <svg
                 className="absolute -bottom-1.5 left-0 w-full h-3.5 text-primary/35 overflow-visible"
-                viewBox="0 0 200 12" 
+                viewBox="0 0 200 12"
                 preserveAspectRatio="none"
                 fill="none"
                 aria-hidden="true"
               >
-                <path 
-                  d="M2 9 Q 50 2, 100 9 T 198 9" 
-                  stroke="currentColor" 
+                <path
+                  d="M2 9 Q 50 2, 100 9 T 198 9"
+                  stroke="currentColor"
                   strokeWidth="4"
                   strokeLinecap="round"
                 />
@@ -126,7 +127,8 @@ export function CTASection() {
 
           {/* Subheadline */}
           <p className="text-lg lg:text-xl text-white/60 max-w-2xl mx-auto mb-11 text-pretty leading-relaxed">
-            Stop guessing. Start building products people actually need. Get validated insights from real conversations in seconds.
+            Stop guessing. Start building products people actually need. Get
+            validated insights from real conversations in seconds.
           </p>
 
           {/* CTA Buttons */}
@@ -166,28 +168,29 @@ export function CTASection() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-5 lg:gap-8">
               {features.map((feature, index) => {
-                const Icon = feature.icon
+                const Icon = feature.icon;
                 return (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3"
-                  >
+                  <div key={index} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-white/8 flex items-center justify-center border border-white/8">
                       <Icon className="w-4 h-4 text-primary" />
                     </div>
-                    <span className="text-sm text-white/60 font-medium">{feature.text}</span>
+                    <span className="text-sm text-white/60 font-medium">
+                      {feature.text}
+                    </span>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
 
           <div className="mt-10 flex justify-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} {SITE_CONFIG.name}. All rights reserved.</p>
-            
+            <p>
+              &copy; {new Date().getFullYear()} {SITE_CONFIG.name}. All rights
+              reserved.
+            </p>
           </div>
         </div>
       </div>
     </section>
-  )
+  );
 }

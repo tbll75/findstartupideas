@@ -9,7 +9,9 @@ import type { SearchResult, SearchResultItem } from "@/types";
  * Transform SearchResult to UI format
  * Groups quotes by pain point and maps to display format
  */
-export function transformSearchResult(result: SearchResult): SearchResultItem[] {
+export function transformSearchResult(
+  result: SearchResult
+): SearchResultItem[] {
   // Group quotes by pain point
   const quotesByPainPoint = new Map<
     string,

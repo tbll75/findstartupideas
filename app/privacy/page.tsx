@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE_CONFIG } from "@/constants/branding";
+import { SITE_CONFIG } from "@/constants";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -121,14 +121,14 @@ export default function PrivacyPage() {
                 <li>
                   <strong>Vercel:</strong> Hosting, analytics, and performance
                   monitoring. See{" "}
-                  <a
+                  <Link
                     href="https://vercel.com/legal/privacy-policy"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline focus-ring rounded"
                   >
                     Vercel&apos;s Privacy Policy
-                  </a>
+                  </Link>
                   .
                 </li>
                 <li>

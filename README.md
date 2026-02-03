@@ -30,6 +30,7 @@ A production-ready tool that analyzes Hacker News conversations to extract custo
 Before you begin, ensure you have:
 
 - Node.js 18+ installed
+- **pnpm** installed (`npm install -g pnpm` or enable via [Corepack](https://nodejs.org/api/corepack.html))
 - A Supabase account (free tier works)
 - An Upstash Redis account (free tier works)
 - A Google AI Studio API key (Gemini)
@@ -47,32 +48,32 @@ cd reminer
 ### 2. Install Dependencies
 
 ```bash
-npm install
-# or
 pnpm install
-# or
-yarn install
 ```
 
 ### 3. Set Up Supabase
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to **Project Settings → API** and copy:
+
    - Project URL (NEXT_PUBLIC_SUPABASE_URL)
    - publishable key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
    - service_role key (SUPABASE_SERVICE_ROLE_KEY)
 
 3. Run the database schema:
+
    - Go to **SQL Editor** in Supabase dashboard
    - Copy contents from `supabase/schema.sql`
    - Execute the SQL
 
 4. Run the queue processing setup (pg_cron + pg_net for resilience):
+
    - Go to **SQL Editor** in Supabase dashboard
    - Copy contents from `supabase/migrations/20250124_add_queue_processing.sql`
    - Execute the SQL
 
 5. Set up the config table for pg_cron (required on free tier - ALTER DATABASE has permission restrictions):
+
    - Go to **SQL Editor** in Supabase dashboard
    - Run the following SQL, replacing `YOUR_PROJECT_REF` and `YOUR_SERVICE_ROLE_KEY` with your actual values:
 
@@ -98,6 +99,7 @@ yarn install
    ```
 
 6. Update the queue function to read from app_config (required - the migration uses current_setting which fails on free tier):
+
    - Go to **SQL Editor** in Supabase dashboard
    - Run the following SQL to fix the `process_pending_searches` function:
 
@@ -148,6 +150,16 @@ yarn install
    ```
 
 7. RLS policies are already included in schema.sql
+
+8. Enable Realtime for live search updates:
+   - Go to **Database → Tables** in the Supabase dashboard
+   - Enable "Realtime" for these tables:
+     - `ai_analyses`
+     - `pain_point_quotes`
+     - `pain_points`
+     - `search_events`
+     - `search_results`
+     - `searches`
 
 **Verify Supabase setup:**
 
@@ -216,11 +228,7 @@ supabase secrets set UPSTASH_REDIS_REST_TOKEN=your_redis_token
 ### 8. Run the Development Server
 
 ```bash
-npm run dev
-# or
 pnpm dev
-# or
-yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.

@@ -12,9 +12,7 @@ import {
   MAX_UPVOTES_FILTER,
 } from "@/shared/constants";
 
-// ============================================================================
 // REQUEST SCHEMAS
-// ============================================================================
 
 /**
  * Search request validation schema
@@ -23,8 +21,14 @@ export const SearchRequestSchema = z
   .object({
     topic: z
       .string()
-      .min(TOPIC_MIN_LENGTH, `Topic must be at least ${TOPIC_MIN_LENGTH} characters long`)
-      .max(TOPIC_MAX_LENGTH, `Topic must be at most ${TOPIC_MAX_LENGTH} characters long`)
+      .min(
+        TOPIC_MIN_LENGTH,
+        `Topic must be at least ${TOPIC_MIN_LENGTH} characters long`
+      )
+      .max(
+        TOPIC_MAX_LENGTH,
+        `Topic must be at most ${TOPIC_MAX_LENGTH} characters long`
+      )
       .transform((value) => value.trim())
       .refine((value) => value.length > 0, {
         message: "Topic cannot be empty",
@@ -49,9 +53,7 @@ export const SearchRequestSchema = z
 
 export type SearchRequestType = z.infer<typeof SearchRequestSchema>;
 
-// ============================================================================
 // RESPONSE SCHEMAS
-// ============================================================================
 
 /**
  * Pain point schema

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { HomeContent } from "@/components/home-content";
-import { SITE_CONFIG } from "@/constants/branding";
+import { SITE_CONFIG } from "@/constants";
 
 interface HomePageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -16,7 +16,8 @@ export async function generateMetadata({
 }: HomePageProps): Promise<Metadata> {
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : undefined;
-  const searchId = typeof params.searchId === "string" ? params.searchId : undefined;
+  const searchId =
+    typeof params.searchId === "string" ? params.searchId : undefined;
 
   // Default metadata for landing page (inherits from layout)
   if (!query) {

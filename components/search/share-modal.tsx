@@ -12,7 +12,7 @@ import {
   FileImage,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ShareableCard } from "./ShareableCard";
+import { ShareableCard } from "./shareable-card";
 import type { SearchResultItem } from "@/types";
 import {
   captureElement,
@@ -54,7 +54,9 @@ export function ShareModal({
   const [variant, setVariant] = useState<ShareVariant>(
     selectedPainPointIndex !== undefined ? "single" : "full"
   );
-  const [selectedIndex, setSelectedIndex] = useState(selectedPainPointIndex ?? 0);
+  const [selectedIndex, setSelectedIndex] = useState(
+    selectedPainPointIndex ?? 0
+  );
   const [isCapturing, setIsCapturing] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -134,7 +136,9 @@ export function ShareModal({
     }
 
     // Build share URL
-    const shareUrl = `${window.location.origin}/?q=${encodeURIComponent(topic)}`;
+    const shareUrl = `${window.location.origin}/?q=${encodeURIComponent(
+      topic
+    )}`;
     const intentUrl = generateTwitterIntent(tweetText, shareUrl);
 
     // If in twitter mode, also capture and copy image first

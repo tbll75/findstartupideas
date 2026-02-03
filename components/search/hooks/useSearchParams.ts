@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams as useNextSearchParams,
+} from "next/navigation";
 
 export interface SearchFilters {
   query: string;
@@ -24,9 +27,10 @@ export interface SearchParamsActions {
 /**
  * Hook for managing search parameters and URL synchronization
  */
-export function useSearchFilters(): SearchFilters & SearchParamsActions & {
-  urlSearchParams: URLSearchParams | null;
-} {
+export function useSearchFilters(): SearchFilters &
+  SearchParamsActions & {
+    urlSearchParams: URLSearchParams | null;
+  } {
   const router = useRouter();
   const searchParams = useNextSearchParams();
 

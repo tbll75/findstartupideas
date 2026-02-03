@@ -3,10 +3,7 @@
  * Mirrors types from the main app for Deno compatibility
  */
 
-// ============================================================================
 // Database Row Types
-// ============================================================================
-
 export type SearchRow = {
   id: string;
   topic: string;
@@ -64,10 +61,7 @@ export type SearchEventRow = {
   created_at?: string;
 };
 
-// ============================================================================
 // API Payload Types
-// ============================================================================
-
 export type SearchResultPayload = {
   searchId: string;
   status: "pending" | "processing" | "completed" | "failed";
@@ -105,10 +99,7 @@ export type SearchResultPayload = {
   };
 };
 
-// ============================================================================
 // HN Types
-// ============================================================================
-
 export type HNSearchParams = {
   topic: string;
   tags: string[];
@@ -141,10 +132,7 @@ export type HNComment = {
   permalink: string;
 };
 
-// ============================================================================
 // Gemini Types
-// ============================================================================
-
 export type GeminiAnalysis = {
   summary: string;
   problemClusters: Array<{

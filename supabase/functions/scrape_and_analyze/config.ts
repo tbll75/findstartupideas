@@ -2,10 +2,7 @@
  * Configuration and Environment Variables
  */
 
-// ============================================================================
 // Environment Variables
-// ============================================================================
-
 export const SUPABASE_URL =
   Deno.env.get("SUPABASE_URL") ??
   Deno.env.get("NEXT_PUBLIC_SUPABASE_URL") ??
@@ -20,19 +17,14 @@ export const REDIS_TOKEN = Deno.env.get("UPSTASH_REDIS_REST_TOKEN") ?? "";
 export const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 export const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
 
-// ============================================================================
 // Validation
-// ============================================================================
-
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.warn(
     "[config] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars."
   );
 }
 
-// ============================================================================
 // Constants
-// ============================================================================
 
 /** Default TTL for cached search results: 2 hours */
 export const DEFAULT_RESULT_TTL_SECONDS = 60 * 60 * 2;

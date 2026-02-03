@@ -21,13 +21,10 @@ export function HomeContent() {
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1">
-        {/* Hero section with integrated search - always visible */}
         <HeroSection />
 
-        {/* Search section - always visible for results */}
         <SearchSection />
 
-        {/* Landing page sections - hidden when searching */}
         {!hasSearchQuery && (
           <>
             <HowItWorksSection />

@@ -117,7 +117,7 @@ export function EmailGateModal({
             setError(data.error);
             return;
           }
-          
+
           // Server error (API failure) - show friendly message and let user through
           setError("Something went wrong — but you're good to go!");
           onSuccess();
